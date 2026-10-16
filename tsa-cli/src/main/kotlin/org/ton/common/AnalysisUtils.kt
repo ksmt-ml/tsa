@@ -21,6 +21,7 @@ import org.usvm.machine.TvmConcreteContractData
 import org.usvm.machine.TvmContext
 import org.usvm.machine.TvmOptions
 import org.usvm.machine.TvmPathSelectionStrategy
+import org.usvm.machine.TvmSolverProfileOptions
 import org.usvm.machine.analyzeInterContract
 import org.usvm.machine.hexToCell
 import org.usvm.machine.state.ContractId
@@ -33,6 +34,7 @@ import org.usvm.test.resolver.TvmSymbolicTestSuite
 import org.usvm.test.resolver.TvmTestFailure
 import java.math.BigInteger
 import java.nio.file.Path
+import java.util.UUID
 import kotlin.collections.filter
 import kotlin.io.path.readText
 import kotlin.time.Duration.Companion.INFINITE
@@ -81,6 +83,33 @@ private fun createTvmOptions(
                 } else {
                     TvmPathSelectionStrategy.DFS_BASED
                 },
+            solverProfileOptions =
+                analysisOptions.solverProfileDirectory?.let { outputDirectory ->
+                    TvmSolverProfileOptions(
+                        outputDirectory = outputDirectory,
+                        runId = analysisOptions.solverProfileRunId ?: UUID.randomUUID().toString(),
+                        workloadId = analysisOptions.solverProfileWorkloadId,
+                        maxRecordedEvents = analysisOptions.solverProfileMaxEvents,
+                        checkpointIntervalChecks = analysisOptions.solverProfileCheckpointInterval,
+                        attributes =
+                            buildMap {
+                                put("analysis.solver-timeout-seconds", analysisOptions.solverTimeout.toString())
+                                put("analysis.int-blasting-enabled", (!analysisOptions.noIntBlasting).toString())
+                                put(
+                                    "analysis.iteration-limit",
+                                    optionsValue(analysisOptions.noIterationLimit, analysisOptions.iterationLimit),
+                                )
+                                put(
+                                    "analysis.recursion-depth",
+                                    optionsValue(
+                                        analysisOptions.noRecursionDepthLimit,
+                                        analysisOptions.maxRecursionDepth,
+                                    ),
+                                )
+                                analysisOptions.timeout?.let { put("analysis.timeout-seconds", it.toString()) }
+                            },
+                    )
+                },
         )
 
     if (interContractSchemePath != null) {
@@ -95,6 +124,11 @@ private fun createTvmOptions(
 
     return options
 }
+
+private fun optionsValue(
+    unlimited: Boolean,
+    value: Int,
+): String = if (unlimited) "unlimited" else value.toString()
 
 fun <SourcesDescription> performAnalysis(
     analyzer: TvmAnalyzer<SourcesDescription>,

@@ -28,9 +28,10 @@ dependencies {
     testImplementation("ch.qos.logback:logback-classic:${Versions.logback}")
 
     api(group = Packages.ksmt, name = "ksmt-core", version = Versions.ksmt)
+    implementation(group = Packages.ksmt, name = "ksmt-profiling", version = Versions.ksmt)
+    implementation(group = Packages.ksmt, name = "ksmt-runner", version = Versions.ksmt)
     implementation(group = Packages.ksmtBv2Int, name = "ksmt-bv2int", version = Versions.ksmtBv2Int)
-    implementation(group = Packages.ksmt, name = "ksmt-yices", version = Versions.ksmt)
-    implementation(group = Packages.ksmt, name = "ksmt-z3", version = Versions.ksmt)
+    implementation(group = Packages.ksmt, name = "ksmt-cvc5", version = Versions.ksmt)
     implementation("com.charleskorn.kaml:kaml:${Versions.kaml}")
 
     // todo: remove ksmt-core exclude after upgrading ksmt version in USVM

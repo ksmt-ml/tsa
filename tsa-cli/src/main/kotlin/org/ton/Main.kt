@@ -5,10 +5,12 @@ import com.github.ajalt.clikt.core.subcommands
 import org.ton.commands.BocAnalysis
 import org.ton.commands.CheckerAnalysis
 import org.ton.commands.CompiledCheckerAnalysis
+import org.ton.commands.Cvc5OptionInventory
 import org.ton.commands.FiftAnalysis
 import org.ton.commands.FuncAnalysis
 import org.ton.commands.InterContractAnalysis
 import org.ton.commands.OpcodeExtraction
+import org.ton.commands.SolverProfileReplay
 import org.ton.commands.TactAnalysis
 import org.ton.commands.TestGeneration
 
@@ -26,4 +28,6 @@ fun main(args: Array<String>) =
             InterContractAnalysis(),
             CompiledCheckerAnalysis(),
             OpcodeExtraction(),
+            SolverProfileReplay(),
+            Cvc5OptionInventory(),
         ).main(args)
