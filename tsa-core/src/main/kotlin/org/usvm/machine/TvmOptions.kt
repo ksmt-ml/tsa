@@ -7,6 +7,8 @@ import org.usvm.machine.TvmMachine.Companion.DEFAULT_MAX_RECURSION_DEPTH
 import org.usvm.machine.TvmMachine.Companion.DEFAULT_MAX_TLB_DEPTH
 import org.usvm.machine.state.ContractId
 import java.math.BigInteger
+import java.nio.file.Path
+import java.util.UUID
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.seconds
 
@@ -62,6 +64,8 @@ data class TvmOptions(
     val enumeratingModelsCountLimit: Int = 5,
     val ignoreLowPriorityStates: Boolean = false,
     val forkOnEachPossibleElementInDictGet: Boolean = false,
+    /** Optional collection of KSMT solver workload profiles. Disabled by default. */
+    val solverProfileOptions: TvmSolverProfileOptions? = null,
 ) {
     init {
         check(enableOutMessageAnalysis || !intercontractOptions.isIntercontractEnabled) {
@@ -73,6 +77,23 @@ data class TvmOptions(
         check(!addTimeoutIfNotSatiated || divideTimeBetweenOpcodes == null) {
             "Cannot use strategy [addTimeoutIfNotSatiated] together with [divideTimeBetweenOpcodes]"
         }
+    }
+}
+
+data class TvmSolverProfileOptions(
+    val outputDirectory: Path,
+    val runId: String = UUID.randomUUID().toString(),
+    val workloadId: String? = null,
+    val maxRecordedEvents: Int = 1_000_000,
+    val checkpointIntervalChecks: Int = 100,
+    val attributes: Map<String, String> = emptyMap(),
+) {
+    init {
+        require(runId.isNotBlank()) { "Solver profile run id must not be blank" }
+        require(workloadId?.isNotBlank() != false) { "Solver profile workload id must not be blank" }
+        require(maxRecordedEvents > 0) { "Maximum recorded event count must be positive" }
+        require(checkpointIntervalChecks > 0) { "Checkpoint interval must be positive" }
+        require(attributes.keys.none { it.isBlank() }) { "Profile attribute names must not be blank" }
     }
 }
 

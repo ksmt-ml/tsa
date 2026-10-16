@@ -25,6 +25,29 @@ class AnalysisOptions : OptionGroup("Symbolic analysis options") {
         .default(1)
         .help("Solver timeout in seconds. Default: 1.")
 
+    val solverProfileDirectory by option("--solver-profile-dir")
+        .path(canBeFile = false)
+        .help(
+            "Directory for v0 KSMT solver workload profiles. " +
+                "Profiling is disabled when this option is absent.",
+        )
+
+    val solverProfileRunId by option("--solver-profile-run-id")
+        .help("Stable run id used to link all solver profiles produced by one analysis.")
+
+    val solverProfileWorkloadId by option("--solver-profile-workload-id")
+        .help("Stable workload id used for grouped dataset splits and repeated evaluations.")
+
+    val solverProfileMaxEvents by option("--solver-profile-max-events")
+        .int()
+        .default(1_000_000)
+        .help("Maximum number of events retained by each solver profile. Default: 1000000.")
+
+    val solverProfileCheckpointInterval by option("--solver-profile-checkpoint-interval")
+        .int()
+        .default(100)
+        .help("Write an atomic in-progress snapshot after this many checks. Default: 100.")
+
     val continueOnContractException by option("--continue-on-contract-exception")
         .flag()
         .help(
