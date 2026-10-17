@@ -10,6 +10,7 @@ when (val useLocalTuningContracts = providers.gradleProperty("useLocalTuningCont
         }
         includeBuild(localKsmt)
         includeBuild(localTuner)
+        include("tsa-tuning-api")
     }
     else -> error(
         "Gradle property useLocalTuningContracts must be either true or false, " +
@@ -25,7 +26,6 @@ pluginManagement {
 }
 
 include("tsa-core")
-include("tsa-tuning-api")
 include("tsa-cli")
 include("tsa-sarif")
 include("tsa-test-gen")

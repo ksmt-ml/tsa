@@ -14,8 +14,8 @@ data class TsaWorkloadReference(
  * A resolved TSA workload for cvc5 configuration search.
  *
  * The evaluator must recognize exactly the advertised [instances]. Every evaluation must run in
- * isolation with a fresh solver, apply the proposed patch before the first assertion, and report
- * correctness through the tuner-owned observation contract.
+ * isolation with a fresh solver, apply the validated configuration before the first assertion,
+ * and report correctness through the tuner-owned observation contract.
  */
 interface TsaCvc5TrialWorkload : Cvc5TrialEvaluator {
     val reference: TsaWorkloadReference
