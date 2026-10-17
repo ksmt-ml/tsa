@@ -1,5 +1,23 @@
 rootProject.name = "tsa"
 
+when (val useLocalTuningContracts = providers.gradleProperty("useLocalTuningContracts").orNull) {
+    null, "false" -> Unit
+    "true" -> {
+        val localKsmt = file("../ksmt")
+        val localTuner = file("../ksmt-ml-tuner")
+        require(localKsmt.isDirectory && localTuner.isDirectory) {
+            "Local KSMT and ksmt-ml-tuner checkouts must exist next to TSA"
+        }
+        includeBuild(localKsmt)
+        includeBuild(localTuner)
+        include("tsa-tuning-api")
+    }
+    else -> error(
+        "Gradle property useLocalTuningContracts must be either true or false, " +
+            "got: $useLocalTuningContracts",
+    )
+}
+
 pluginManagement {
     repositories {
         mavenCentral()

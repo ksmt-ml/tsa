@@ -14,3 +14,6 @@ buildSrc/.gradle
 *.blkstate
 
 .explyt
+
+# Local solver-profile captures may contain application data and are not source.
+/solver-profiles/
