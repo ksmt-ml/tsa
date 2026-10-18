@@ -17,3 +17,6 @@ buildSrc/.gradle
 
 # Local solver-profile captures may contain application data and are not source.
 /solver-profiles/
+/hs_err_pid*.log
+/core
+/core.*

@@ -25,7 +25,7 @@ ghcr.io/espritoxyz/tsa:latest \
 Here:
 
 - `SOURCES_DIR_ABSOLUTE_PATH` – the absolute path to the directory containing the source code of the project you want to analyze;
-- `ANALYZER_OPTIONS` – analyzer options (see [the Use Cases Guide](modes/use-cases), or use the `--help` option).
+- `ANALYZER_OPTIONS` – analyzer options (see [the Use Cases Guide](modes/use-cases.md), or use the `--help` option).
 
 <div class="note" style="border: 1px solid #ccc; padding: 10px; border-radius: 5px;">
   <strong>NOTE:</strong> All paths must be RELATIVE to the <code>project</code> dir.
@@ -80,4 +80,3 @@ java -jar tsa-cli.jar
    {% highlight bash %} ./gradlew tsa-cli:shadowJar {% endhighlight %}
    from the root of the project to build the tool JAR executable (will be located in the build dir of the <code>tsa-cli</code> module)</li>
 </ol>
-
