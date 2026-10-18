@@ -9,7 +9,7 @@ nav_order: 1
 
 As a static analyzer, `TSA` can operate in two modes: 
 - **Runtime error detection** for local smart contracts with report generation in [SARIF format](https://sarifweb.azurewebsites.net/);
-- [**Test generation**](test-gen-mode) for [Blueprint](https://github.com/ton-org/blueprint) projects.
+- [**Test generation**](test-gen-mode.md) for [Blueprint](https://github.com/ton-org/blueprint) projects.
 
 In runtime error detection mode, `TSA` accepts as input a contract file in one of the following formats:
 
@@ -198,7 +198,7 @@ The output in this mode is a SARIF report containing the following information a
   - The parameters might be returned in two formats: `recvInternalInput` and `stackInput`. The first one is used when analyzing `recv_internal` method.
 - `gasUsage` - approximate gas usage of the execution when the error occurred
 
-For more information about error types, see the [Detectors page](../detectors).
+For more information about error types, see the [Detectors page](../reference/detectors.md).
 
 ---
 
