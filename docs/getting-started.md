@@ -13,7 +13,7 @@ docker run --platform linux/amd64 -it --rm -v [SOURCES_DIR_ABSOLUTE_PATH]:/proje
 Here:
 
 - `SOURCES_DIR_ABSOLUTE_PATH` – the absolute path to the directory containing the source code of the project you want to analyze;
-- `ANALYZER_OPTIONS` – analyzer options (see [details](./error-checking-tests-generation-mode.md), or use the `--help` option).
+- `ANALYZER_OPTIONS` – analyzer options (see [the Use Cases Guide](modes/use-cases.md), or use the `--help` option).
 
 **NOTE**: All paths in `ANALYZER_OPTIONS` must be RELATIVE to `SOURCES_DIR_ABSOLUTE_PATH`.
 
@@ -55,4 +55,4 @@ Currently, `TSA` is not supported on Windows.
    - [FunC and Fift compilers](https://github.com/ton-blockchain/ton/releases/latest)
 2. Clone this repository
 3. Ensure `tact`, `func`, and `fift` are in your `$PATH`
-4. Run `./gradlew tsa-cli:shadowJar` from the root of the project to build [error-checking analysis tool](modes/use-cases) (will be located in [build dir](../tsa-cli/build/libs/tsa-cli.jar))
+4. Run `./gradlew tsa-cli:shadowJar` from the root of the project to build [error-checking analysis tool](modes/use-cases.md) (will be located in [build dir](../tsa-cli/build/libs/tsa-cli.jar))
