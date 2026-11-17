@@ -2,6 +2,24 @@
 
 GitHub CI builds, tests and performs linter checks on the project.
 
+## Repository layout and JDK
+
+TSA is built together with two sibling repositories, which must be checked out
+next to the TSA repository:
+
+```text
+<workspace>/
+├── ksmt           # https://github.com/ksmt-ml/ksmt
+├── ksmt-ml-tuner  # https://github.com/ksmt-ml/ksmt-ml-tuner
+└── tsa            # this repository
+```
+
+They provide `io.ksmt:ksmt-profiling` and `io.ksmt:ksmt-ml-tuner`, which are not
+published to a public repository yet, so any TSA build requires them.
+
+The build must run on **JDK 17** (`JAVA_HOME` must point to it). KSMT compiles
+its modules with `-Werror` and does not build on newer JDKs.
+
 ## How to build CLI tool
 
 1. Clone this repo (using `IntelliJ Idea` or `git clone https://github.com/espritoxyz/tsa`).

@@ -19,15 +19,14 @@ cvc5 solver, and applies that configuration before its first assertion. TSA
 remains authoritative for workload execution, correctness, and artifact
 references.
 
-For local cross-repository validation, place `ksmt`, `ksmt-ml-tuner`, and `tsa`
-next to each other and run:
+For cross-repository validation, place `ksmt`, `ksmt-ml-tuner`, and `tsa` next to
+each other and run:
 
 ```text
-../ksmt/gradlew -p . -PuseLocalTuningContracts=true :tsa-tuning-api:check
+../ksmt/gradlew -p . :tsa-tuning-api:check
 ```
 
-No external artifact publication is assumed at this stage. The module is
-included only when `useLocalTuningContracts=true`; the ordinary TSA build stays
-independent of the sibling repositories. Internal development and CI that
-validate these contracts must check out all three repositories side by side
-and enable the flag explicitly.
+`io.ksmt:ksmt-profiling` and `io.ksmt:ksmt-ml-tuner` are not published to a
+public repository yet, so the sibling checkouts are required for any TSA build.
+The build must run on JDK 17: KSMT compiles its modules with `-Werror` and fails
+on newer JDKs.
