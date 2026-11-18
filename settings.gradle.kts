@@ -28,6 +28,7 @@ include("tsa-jettons")
 include("tsa-test")
 include("tsa-metrics")
 include("tsa-tuning-api")
+include("tsa-tuning")
 
 // TODO: fix this module (https://github.com/explyt/tsa/issues/118)
 // include("tsa-intellij")
