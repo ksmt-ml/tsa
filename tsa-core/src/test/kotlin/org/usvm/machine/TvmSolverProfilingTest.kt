@@ -114,6 +114,56 @@ class TvmSolverProfilingTest {
     }
 
     @Test
+    fun `terminal profiles are emitted to the sink and written to disk`() {
+        val outputDirectory = Files.createTempDirectory("tsa-cvc5-profile-sink-test")
+        val emitted = mutableListOf<KSolverProfile>()
+        val options =
+            TvmOptions(
+                solverProfileOptions =
+                    TvmSolverProfileOptions(
+                        outputDirectory,
+                        onTerminalProfile = { emitted += it },
+                    ),
+            )
+        val components = TvmComponents(options)
+        val ctx = TvmContext(options, components)
+
+        try {
+            try {
+                components.mkKsmtSolver(ctx).let { solver ->
+                    solver.push()
+                    solver.assert(ctx.mkTrue())
+                    assertEquals(KSolverStatus.SAT, solver.check(1.seconds))
+                    solver.pop()
+                }
+            } finally {
+                try {
+                    components.close()
+                } finally {
+                    ctx.close()
+                }
+            }
+
+            assertEquals(3, emitted.size)
+            assertTrue(emitted.all { it.state == KSolverProfileState.CLOSED })
+            assertTrue(emitted.all { it.droppedEventCount == 0L })
+
+            val profileFiles = Files.list(outputDirectory).use { files -> files.iterator().asSequence().toList() }
+            assertEquals(3, profileFiles.size)
+
+            val emittedIds = emitted.map(KSolverProfile::profileId).toSet()
+            assertEquals(3, emittedIds.size)
+            assertTrue(
+                profileFiles.all { file ->
+                    emittedIds.any { id -> file.fileName.toString().contains(id) }
+                },
+            )
+        } finally {
+            outputDirectory.toFile().deleteRecursively()
+        }
+    }
+
+    @Test
     fun `writes a v0 profile as a completed JSON artifact`() {
         val outputDirectory = Files.createTempDirectory("tsa-solver-profiles-test")
         try {

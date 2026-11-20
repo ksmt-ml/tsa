@@ -1,5 +1,6 @@
 package org.usvm.machine
 
+import io.ksmt.profiling.KSolverProfile
 import org.ton.TvmContractHandlers
 import org.usvm.machine.TvmMachine.Companion.DEFAULT_LOOP_ITERATIONS_LIMIT
 import org.usvm.machine.TvmMachine.Companion.DEFAULT_MAX_CELL_DEPTH_FOR_DEFAULT_CELLS_CONSISTENT_WITH_TLB
@@ -87,6 +88,15 @@ data class TvmSolverProfileOptions(
     val maxRecordedEvents: Int = 1_000_000,
     val checkpointIntervalChecks: Int = 100,
     val attributes: Map<String, String> = emptyMap(),
+    /**
+     * Receives every terminal profile snapshot once its solver has been closed, in addition to the
+     * profile JSON artifact written to [outputDirectory]. In-progress checkpoint snapshots are
+     * written to disk only and are never emitted here.
+     *
+     * Profiling is an observation: a failing callback must not turn a successful analysis into a
+     * failed one, so exceptions thrown by it are ignored.
+     */
+    val onTerminalProfile: ((KSolverProfile) -> Unit)? = null,
 ) {
     init {
         require(runId.isNotBlank()) { "Solver profile run id must not be blank" }

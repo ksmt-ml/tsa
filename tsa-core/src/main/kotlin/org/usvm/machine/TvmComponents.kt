@@ -183,7 +183,7 @@ class TvmComponents(
         val checkpointingSolver =
             profileOptions?.let {
                 CheckpointingSolver(wrappedSolver, it.checkpointIntervalChecks) {
-                    writeProfileSnapshots()
+                    writeProfileSnapshots(terminal = false)
                 }
             } ?: wrappedSolver
 
@@ -263,9 +263,17 @@ class TvmComponents(
                 put("environment.available-processors", Runtime.getRuntime().availableProcessors().toString())
             }
 
-    private fun writeProfileSnapshots() {
+    private fun writeProfileSnapshots(terminal: Boolean) {
         val writer = profileWriter ?: return
-        solverProfilers.forEach { writer.write(it.snapshot()) }
+        val onTerminalProfile = options.solverProfileOptions?.onTerminalProfile
+        solverProfilers.forEach { profiler ->
+            val snapshot = profiler.snapshot()
+            writer.write(snapshot)
+            if (terminal) {
+                // Profiling must never turn a successful analysis into a failed one.
+                runCatching { onTerminalProfile?.invoke(snapshot) }
+            }
+        }
     }
 
     override fun mkTypeSystem(ctx: UContext<TvmSizeSort>): UTypeSystem<TvmType> = typeSystem
@@ -274,7 +282,7 @@ class TvmComponents(
         try {
             closeableResources.forEach(AutoCloseable::close)
         } finally {
-            writeProfileSnapshots()
+            writeProfileSnapshots(terminal = true)
         }
     }
 

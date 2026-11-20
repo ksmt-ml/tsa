@@ -28,7 +28,8 @@ dependencies {
     testImplementation("ch.qos.logback:logback-classic:${Versions.logback}")
 
     api(group = Packages.ksmt, name = "ksmt-core", version = Versions.ksmt)
-    implementation(group = Packages.ksmt, name = "ksmt-profiling", version = Versions.ksmt)
+    // TvmSolverProfileOptions exposes the KSMT profile contract to TSA consumers.
+    api(group = Packages.ksmt, name = "ksmt-profiling", version = Versions.ksmt)
     implementation(group = Packages.ksmt, name = "ksmt-runner", version = Versions.ksmt)
     implementation(group = Packages.ksmtBv2Int, name = "ksmt-bv2int", version = Versions.ksmtBv2Int)
     implementation(group = Packages.ksmt, name = "ksmt-cvc5", version = Versions.ksmt)
