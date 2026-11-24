@@ -8,6 +8,7 @@ import org.ton.tuning.TsaCvc5TrialWorkload
 import org.ton.tuning.TsaWorkloadReference
 import org.usvm.machine.TvmCvc5ProfileReplayEvaluator
 import org.usvm.machine.TvmCvc5ReplayCandidate
+import kotlin.time.Duration
 
 /**
  * A TSA workload evaluated by replaying captured, replayable cvc5 backend profiles.
@@ -53,6 +54,10 @@ class TsaCvc5ProfileReplayWorkload(
     ): Cvc5TrialObservation {
         if (cancellation.isCancellationRequested()) {
             return request.cancelledObservation()
+        }
+
+        if (!request.timeout.isInfinite() && request.timeout <= Duration.ZERO) {
+            return request.timedOutObservation()
         }
 
         val profile =

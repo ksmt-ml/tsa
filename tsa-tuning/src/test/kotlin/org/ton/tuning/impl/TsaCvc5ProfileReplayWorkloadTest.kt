@@ -34,6 +34,7 @@ import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
+import kotlin.time.Duration
 import kotlin.time.Duration.Companion.nanoseconds
 import kotlin.time.Duration.Companion.seconds
 
@@ -80,6 +81,23 @@ class TsaCvc5ProfileReplayWorkloadTest {
                 workload.evaluate(request(workload, instanceId = "profile-0"), Cvc5CancellationToken { true })
 
             assertEquals(Cvc5TrialStatus.CANCELLED, observation.status)
+            assertEquals(null, observation.cost)
+        }
+    }
+
+    @Test
+    fun `reports a censored timeout when the trial budget is exhausted`() {
+        withWorkload(KSolverStatus.SAT) { resolver ->
+            val workload = resolver.resolve(reference())
+
+            val observation =
+                workload.evaluate(
+                    request(workload, instanceId = "profile-0", timeout = 1.nanoseconds),
+                    Cvc5CancellationToken.NONE,
+                )
+
+            assertEquals(Cvc5TrialStatus.TIMEOUT, observation.status)
+            assertEquals(true, observation.censored)
             assertEquals(null, observation.cost)
         }
     }
@@ -211,6 +229,7 @@ class TsaCvc5ProfileReplayWorkloadTest {
     private fun request(
         workload: TsaCvc5TrialWorkload,
         instanceId: String,
+        timeout: Duration = 10.seconds,
     ): Cvc5TrialRequest =
         Cvc5TrialRequest(
             searchId = "search-0",
@@ -221,7 +240,7 @@ class TsaCvc5ProfileReplayWorkloadTest {
             instanceId = instanceId,
             seed = 0,
             repetition = 0,
-            timeout = 10.seconds,
+            timeout = timeout,
         )
 
     private fun validatedPatch(): Cvc5ValidatedConfigurationPatch {

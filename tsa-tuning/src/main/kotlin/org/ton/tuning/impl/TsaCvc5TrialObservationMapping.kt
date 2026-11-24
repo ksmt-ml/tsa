@@ -13,9 +13,9 @@ private const val REPLAY_OUTCOME_SUCCESS = "SUCCESS"
 /**
  * Maps one replay result into the tuner-owned observation contract.
  *
- * A replay is rankable only when it completed and every recorded check matched its recorded status.
- * A mismatching status is a wrong answer, an unresolved recorded status is a censored timeout, and
- * a replay that failed to complete is an infrastructure failure.
+ * A replay is rankable only when it completed, stayed inside its trial budget, and every recorded
+ * check matched its recorded status. A mismatching status is a wrong answer, an unresolved recorded
+ * status is a censored timeout, and a replay that failed to complete is an infrastructure failure.
  */
 internal fun TvmCvc5ProfileReplayResult.toObservation(request: Cvc5TrialRequest): Cvc5TrialObservation {
     val status: Cvc5TrialStatus
@@ -24,6 +24,15 @@ internal fun TvmCvc5ProfileReplayResult.toObservation(request: Cvc5TrialRequest)
     val cost: Double?
 
     when {
+        // A replay that outlived its trial budget is a censored observation, not a measurement of
+        // the candidate. The tuner host additionally owns hard termination of a stuck evaluator.
+        request.isBudgetExceeded(wallDurationNanos) -> {
+            status = Cvc5TrialStatus.TIMEOUT
+            correctness = Cvc5TrialCorrectness.NOT_ESTABLISHED
+            censored = true
+            cost = null
+        }
+
         outcome != REPLAY_OUTCOME_SUCCESS -> {
             status = Cvc5TrialStatus.INFRASTRUCTURE_FAILURE
             correctness = Cvc5TrialCorrectness.NOT_ESTABLISHED
@@ -85,6 +94,20 @@ internal fun Cvc5TrialRequest.infrastructureFailure(message: String): Cvc5TrialO
         correctness = Cvc5TrialCorrectness.NOT_ESTABLISHED,
         attributes = mapOf("failure" to message),
     )
+
+internal fun Cvc5TrialRequest.timedOutObservation(): Cvc5TrialObservation =
+    Cvc5TrialObservation(
+        requestId = requestId,
+        status = Cvc5TrialStatus.TIMEOUT,
+        cost = null,
+        duration = Duration.ZERO,
+        censored = true,
+        correctness = Cvc5TrialCorrectness.NOT_ESTABLISHED,
+    )
+
+/** Whether a replay of [durationNanos] already exceeded the finite trial budget of this request. */
+internal fun Cvc5TrialRequest.isBudgetExceeded(durationNanos: Long): Boolean =
+    !timeout.isInfinite() && durationNanos.nanoseconds > timeout
 
 private fun TvmCvc5ProfileReplayResult.replayAttributes(): Map<String, String> =
     buildMap {
