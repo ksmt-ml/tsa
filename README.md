@@ -21,9 +21,10 @@ TSA is designed for a few purposes:
 ### cvc5 tuning integration
 
 TSA selects a cvc5 configuration for a fresh solver behind the
-[`tsa-tuning-api`](tsa-tuning-api/README.md) launch and evaluator boundary.
-Solver profiling and configuration search are provided by the sibling `ksmt`
-and `ksmt-ml-tuner` repositories, which must be checked out next to TSA; see
+[`tsa-tuning-api`](tsa-tuning-api/README.md) launch and evaluator boundary, which
+[`tsa-tuning`](tsa-tuning/README.md) implements in-process. Solver profiling and
+configuration search are provided by the sibling `ksmt` and `ksmt-ml-tuner`
+repositories, which must be checked out next to TSA; see
 [`CONTRIBUTING.md`](CONTRIBUTING.md) for the required layout and JDK version.
 
 TSA remains authoritative for workload execution, the correctness oracle, and
