@@ -8,6 +8,146 @@ The module depends on `tsa-core`, `tsa-tuning-api`, and the sibling `ksmt` and
 `ksmt-ml-tuner` checkouts. See [`CONTRIBUTING.md`](../CONTRIBUTING.md) for the
 required repository layout and JDK version.
 
+## ML team quickstart
+
+TSA is the measuring instrument of the loop. It captures a real analysis into
+replayable cvc5 workloads, evaluates any candidate configuration against them with
+a correctness oracle, and applies an accepted configuration to a real analysis.
+
+### 1. Describe a workload
+
+A workload is one bounded analysis: a contract, a target, its limits, and a TSA
+seed. It is a versioned `tsa-analysis-workload-v0` document stored next to the
+profiles that capture will produce:
+
+```text
+<workloadsRoot>/
+  <workloadId>/
+    <revision>/
+      workload.json                    # the descriptor you author
+      tsa-solver-profile-*.json        # the profiles capture writes
+```
+
+Start from [`examples/workload.json`](examples/workload.json):
+
+```json
+{
+  "schemaVersion": "tsa-analysis-workload-v0",
+  "workloadId": "integer-underflow-receivers",
+  "revision": "r1",
+  "sourceKind": "boc",
+  "sourcePath": "tsa-test/src/test/resources/demo/boc/integer-underflow.boc",
+  "targetKind": "receivers",
+  "methodTimeoutSeconds": 60,
+  "solverTimeoutSeconds": 5,
+  "iterationLimit": 6,
+  "maxRecursionDepth": 5
+}
+```
+
+`sourcePath` is resolved against the process working directory. A revision is
+immutable: capture refuses to write into a revision that already holds profiles,
+so a second capture needs a new revision.
+
+### 2. Capture the workload
+
+```kotlin
+val root = Paths.get("build/workloads")
+val reference = TsaWorkloadReference(workloadId = "integer-underflow-receivers", revision = "r1")
+
+val launch =
+    TsaSolverProfileLauncherImpl(
+        catalog = FileSystemTsaAnalysisWorkloadCatalog(root),
+        profileStoreRoot = root,
+    ).launch(
+        request =
+            TsaSolverProfileLaunchRequest(
+                runId = "capture-1",
+                workload = reference,
+                solver = KSolverDescriptor("cvc5"),
+            ),
+        sink = TsaSolverProfileSink { profile -> captured += profile },
+        cancellation = TsaLaunchCancellation.NONE,
+    )
+
+check(launch.status == TsaSolverProfileLaunchStatus.COMPLETED) {
+    "${launch.failureType}: ${launch.failureMessage}"
+}
+```
+
+`launch.capturedProfiles` counts only complete, replayable profiles. To run a
+capture without writing any code, use the
+[end-to-end harness](#end-to-end-mvp-harness):
+
+```bash
+./gradlew :tsa-tuning:runTuningMvp \
+  -Pcontract=tsa-test/src/test/resources/demo/boc/integer-underflow.boc \
+  -Pcandidates=6
+```
+
+### 3. Evaluate candidate configurations
+
+```kotlin
+val workload =
+    TsaCvc5ProfileReplayWorkloadResolver(
+        profilesRoot = root,
+        parameterSpaceId = parameterSpace.parameterSpaceId,
+    ).resolve(reference)
+
+// TsaCvc5TrialWorkload is a Cvc5TrialEvaluator, so it is passed to the tuner directly.
+val observation = workload.evaluate(request, cancellationToken)
+```
+
+Every trial replays exactly one captured profile against a fresh, isolated cvc5
+solver, with the validated configuration applied before its first assertion.
+[Trial evaluation](#trial-evaluation) maps a replay result to a
+`Cvc5TrialObservation`; only `SUCCESS` with `CORRECT` is rankable.
+
+`TsaSolverProfileLauncherImpl.profileStoreRoot` and
+`TsaCvc5ProfileReplayWorkloadResolver.profilesRoot` are the same root, so a
+freshly captured workload is immediately resolvable.
+
+### 4. Apply an accepted configuration to a real analysis
+
+Write the accepted `Cvc5ValidatedConfigurationPatch` as a
+`tsa-cvc5-configuration-v0` document, starting from
+[`examples/cvc5-configuration.json`](examples/cvc5-configuration.json):
+
+```json
+{
+  "schemaVersion": "tsa-cvc5-configuration-v0",
+  "parameterSpaceId": "cvc5-1.3.4-regular-bv-wide-v0",
+  "backendRole": "regular-bv",
+  "options": { "solve-bv-as-int": "bitwise" }
+}
+```
+
+```bash
+java -jar tsa-cli.jar boc -i contract.boc \
+  --cvc5-configuration cvc5-configuration.json -o tuned.sarif
+```
+
+`--cvc5-configuration` is accepted by every analysis command: `boc`, `func`,
+`tact`, `fift`, `checker`, `compiled-checker`, `inter-contract`, and `test-gen`.
+Only the named backend role is configured, so the other role keeps the defaults,
+and the applied options are recorded in the captured profile so that replaying
+that profile reproduces exactly the configuration it was captured with.
+
+The document is validated structurally, and TSA refuses the option names it owns
+itself, because they would make a captured profile unreplayable or make costs
+incomparable:
+
+| Refused | Why |
+| --- | --- |
+| `logic` | the analysis and the replay set the logic themselves |
+| `tlimit-per` | the per-check timeout belongs to the evaluator |
+| `produce-models`, `produce-unsat-cores`, `incremental`, `arrays-exp`, `fp-exp` | the evaluator depends on their values |
+| `ksmt.optimize.theories`, `ksmt.quantifiers-allowed` | KSMT writes its own keys into the same override map |
+
+An option name the loaded cvc5 build does not list is reported as a warning rather
+than rejected: a parameter space owns option domains, and an inventory describes
+one native library build.
+
 ## Workload layout
 
 A workload is one independent analysis task: a contract, a method, its input
@@ -103,8 +243,22 @@ The harness deliberately uses the stub `Cvc5ParameterSpaceImpl` and only the TSA
 side of the loop: the production search host and a real parameter-space document
 belong to `ksmt-ml-tuner`.
 
-## Scope
+## Known limitations
 
-`tact` sources are not described by the workload schema yet, because they need a
-compiled Tact project rather than a single contract file. Capturing a Tact
-workload therefore has to go through a FunC/BoC artifact for now.
+- **Replay measures the cvc5 backend, not the whole analysis.** A replay reports the cost of the
+  captured solver sessions. To measure the effect on a full analysis, run it twice with and without
+  `--cvc5-configuration` and compare wall time plus the SARIF report; only the witness input values
+  should differ.
+- **The parameter space is still a stub.** `ksmt-ml-tuner` ships `Cvc5ParameterSpaceImpl`, which
+  validates structure but not option domains, and no `Cvc5ParameterSpaceLoader` implementation
+  exists. TSA therefore warns about option names the loaded cvc5 build does not list instead of
+  rejecting them, and cvc5 itself rejects an unknown option when the solver is initialized.
+- **The ML-side providers are not implemented yet.** `ksmt-ml-tuner` contains the inference pipeline
+  and deterministic stubs; it has no `Cvc5ConfigurationSearch` implementation, no ONNX adapter, and
+  no search worker, and `ksmt-ml` publishes neither artifact on this branch.
+- **No production command authors `workload.json`.** The descriptor is a curated artifact: copy
+  [`examples/workload.json`](examples/workload.json) and edit it.
+- **`tact` sources are not described by the workload schema yet**, because they need a compiled Tact
+  project rather than a single contract file. Capturing a Tact workload has to go through a FunC/BoC
+  artifact for now.
+- **The FunC path is implemented but not exercised here.** It needs the `fift` and `func` binaries.

@@ -17,7 +17,9 @@ The boundaries are:
 Each trial receives a `Cvc5ValidatedConfigurationPatch`, uses a fresh isolated
 cvc5 solver, and applies that configuration before its first assertion. TSA
 remains authoritative for workload execution, correctness, and artifact
-references.
+references. [`tsa-tuning/README.md`](../tsa-tuning/README.md#ml-team-quickstart)
+has the end-to-end flow: capture, evaluate, and apply a configuration to a real
+analysis.
 
 For cross-repository validation, place `ksmt`, `ksmt-ml-tuner`, and `tsa` next to
 each other and run:

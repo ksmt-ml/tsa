@@ -44,7 +44,10 @@ java -jar tsa-cli.jar boc -i contract.boc \
 Only the named backend role is configured; the other one keeps the defaults.
 Options reach the solver before its first assertion, and a captured profile
 records them, so replaying that profile reproduces exactly the configuration the
-profile was captured with.
+profile was captured with. TSA refuses the option names it owns itself, because
+they would make a captured profile unreplayable or make costs incomparable. See
+[`tsa-tuning/README.md`](tsa-tuning/README.md#ml-team-quickstart) for the
+end-to-end flow, the refused names, and the known limitations.
 
 ### Funding
 TSA has been funded by the [TON Foundation grant](https://github.com/ton-society/grants-and-bounties/issues/489) grant and has been developed under the [8-month roadmap](https://questbook.app/dashboard/?proposalId=667ee6b9b59d3e9ae042d6c9&chainId=10&role=builder&isRenderingProposalBody=true&grantId=65c7836df27e2e1702d2d279).

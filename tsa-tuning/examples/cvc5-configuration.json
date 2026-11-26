@@ -1,0 +1,8 @@
+{
+  "schemaVersion": "tsa-cvc5-configuration-v0",
+  "parameterSpaceId": "cvc5-1.3.4-regular-bv-wide-v0",
+  "backendRole": "regular-bv",
+  "options": {
+    "solve-bv-as-int": "bitwise"
+  }
+}
