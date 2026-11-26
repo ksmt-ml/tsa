@@ -44,3 +44,39 @@ jobs:
           path: |
             **/build/resources/test/sandbox/
             !**/build/resources/test/sandbox/node_modules/
+
+  tuning-tests:
+    name: cvc5 tuning integration
+    runs-on: ubuntu-24.04
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          path: tsa
+          submodules: recursive
+      - uses: actions/checkout@v4
+        with:
+          repository: ksmt-ml/ksmt
+          ref: cbae6be5aa5e8368ec9ba0d78f9c77e567e171df
+          path: ksmt
+      - uses: actions/checkout@v4
+        with:
+          repository: ksmt-ml/ksmt-ml-tuner
+          ref: 7bda72edf4856d6284ff9808db576b71c1a61355
+          path: ksmt-ml-tuner
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Check tuning modules and build the opt-in CLI
+        run: |
+          ./ksmt/gradlew -p tsa -PuseLocalTuningContracts=true \
+            :tsa-tuning-api:check :tsa-tuning:check \
+            :tsa-core:test --tests '*Cvc5*' --tests '*SolverProfiling*' \
+            :tsa-cli:shadowJar
+
+      - name: Check the opt-in CLI
+        run: |
+          java -jar tsa/tsa-cli/build/libs/tsa-cli.jar --help | grep -F profile-replay
+          java -jar tsa/tsa-cli/build/libs/tsa-cli.jar boc --help | grep -F -- --cvc5-tuning

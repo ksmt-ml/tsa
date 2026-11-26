@@ -11,18 +11,17 @@ import org.ton.options.Receivers
 import org.ton.options.SarifOptions
 import org.ton.options.SpecificMethod
 import org.ton.options.TlbCLIOptions
+import org.ton.options.cvc5SolverFactory
 import org.usvm.machine.ExploreExitCodesStopStrategy
 import org.usvm.machine.FollowTrace
 import org.usvm.machine.IntercontractOptions
 import org.usvm.machine.NoAdditionalStopStrategy
 import org.usvm.machine.TimeDivisionBetweenOpcodes
-import org.usvm.machine.TsaCvc5ConfigurationDocument
 import org.usvm.machine.TvmAnalyzer
 import org.usvm.machine.TvmConcreteContractData
 import org.usvm.machine.TvmContext
 import org.usvm.machine.TvmOptions
 import org.usvm.machine.TvmPathSelectionStrategy
-import org.usvm.machine.TvmSolverProfileOptions
 import org.usvm.machine.analyzeInterContract
 import org.usvm.machine.hexToCell
 import org.usvm.machine.state.ContractId
@@ -35,7 +34,6 @@ import org.usvm.test.resolver.TvmSymbolicTestSuite
 import org.usvm.test.resolver.TvmTestFailure
 import java.math.BigInteger
 import java.nio.file.Path
-import java.util.UUID
 import kotlin.collections.filter
 import kotlin.io.path.readText
 import kotlin.time.Duration.Companion.INFINITE
@@ -84,37 +82,7 @@ private fun createTvmOptions(
                 } else {
                     TvmPathSelectionStrategy.DFS_BASED
                 },
-            cvc5Configuration =
-                analysisOptions.cvc5ConfigurationPath?.let { path ->
-                    TsaCvc5ConfigurationDocument.load(path).toConfiguration()
-                },
-            solverProfileOptions =
-                analysisOptions.solverProfileDirectory?.let { outputDirectory ->
-                    TvmSolverProfileOptions(
-                        outputDirectory = outputDirectory,
-                        runId = analysisOptions.solverProfileRunId ?: UUID.randomUUID().toString(),
-                        workloadId = analysisOptions.solverProfileWorkloadId,
-                        maxRecordedEvents = analysisOptions.solverProfileMaxEvents,
-                        checkpointIntervalChecks = analysisOptions.solverProfileCheckpointInterval,
-                        attributes =
-                            buildMap {
-                                put("analysis.solver-timeout-seconds", analysisOptions.solverTimeout.toString())
-                                put("analysis.int-blasting-enabled", (!analysisOptions.noIntBlasting).toString())
-                                put(
-                                    "analysis.iteration-limit",
-                                    optionsValue(analysisOptions.noIterationLimit, analysisOptions.iterationLimit),
-                                )
-                                put(
-                                    "analysis.recursion-depth",
-                                    optionsValue(
-                                        analysisOptions.noRecursionDepthLimit,
-                                        analysisOptions.maxRecursionDepth,
-                                    ),
-                                )
-                                analysisOptions.timeout?.let { put("analysis.timeout-seconds", it.toString()) }
-                            },
-                    )
-                },
+            solverFactory = analysisOptions.cvc5SolverFactory(),
         )
 
     if (interContractSchemePath != null) {
@@ -129,11 +97,6 @@ private fun createTvmOptions(
 
     return options
 }
-
-private fun optionsValue(
-    unlimited: Boolean,
-    value: Int,
-): String = if (unlimited) "unlimited" else value.toString()
 
 fun <SourcesDescription> performAnalysis(
     analyzer: TvmAnalyzer<SourcesDescription>,

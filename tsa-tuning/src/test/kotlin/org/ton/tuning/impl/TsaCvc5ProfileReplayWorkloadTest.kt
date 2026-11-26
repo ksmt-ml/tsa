@@ -103,6 +103,33 @@ class TsaCvc5ProfileReplayWorkloadTest {
     }
 
     @Test
+    fun `known wrong answers take precedence over an exhausted trial budget`() {
+        withWorkload(KSolverStatus.UNSAT) { resolver ->
+            val workload = resolver.resolve(reference())
+            val request = request(workload, instanceId = "profile-0", timeout = 1.nanoseconds)
+
+            val observation = workload.evaluate(request, Cvc5CancellationToken.NONE)
+
+            assertEquals(Cvc5TrialStatus.WRONG_ANSWER, observation.status)
+            assertEquals(Cvc5TrialCorrectness.INCORRECT, observation.correctness)
+            assertEquals(null, observation.cost)
+        }
+    }
+
+    @Test
+    fun `rejects a trial targeting a different solver version`() {
+        withWorkload(KSolverStatus.SAT) { resolver ->
+            val workload = resolver.resolve(reference())
+            val request = request(workload, instanceId = "profile-0").copy(solverVersion = "0.0.0")
+
+            val observation = workload.evaluate(request, Cvc5CancellationToken.NONE)
+
+            assertEquals(Cvc5TrialStatus.INVALID_CONFIGURATION, observation.status)
+            assertEquals(null, observation.cost)
+        }
+    }
+
+    @Test
     fun `reports an infrastructure failure for an unknown instance`() {
         withWorkload(KSolverStatus.SAT) { resolver ->
             val workload = resolver.resolve(reference())

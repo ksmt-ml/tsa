@@ -28,8 +28,8 @@ class TsaTuningExamplesTest {
     }
 
     @Test
-    fun `the example cvc5 configuration applies to the regular-bv backend`() {
-        val configuration = TsaCvc5ConfigurationDocument.load(example("cvc5-configuration.json")).toConfiguration()
+    fun `the example cvc5 configuration targets the regular-bv backend`() {
+        val configuration = TsaCvc5ConfigurationDocument.load(example("cvc5-configuration.json"))
 
         assertEquals(TvmCvc5Configuration.REGULAR_BV_BACKEND, configuration.backendRole)
         assertEquals(mapOf("solve-bv-as-int" to "bitwise"), configuration.options)

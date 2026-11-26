@@ -34,6 +34,8 @@ data class TvmCvc5OptionInventory(
 
 /** Reads option metadata from the exact cvc5 native library loaded by KSMT. */
 object TvmCvc5OptionInventoryReader {
+    internal val current: TvmCvc5OptionInventory by lazy { read() }
+
     fun read(): TvmCvc5OptionInventory =
         KContext().use { context ->
             KCvc5Solver(context).use { ksmtSolver ->

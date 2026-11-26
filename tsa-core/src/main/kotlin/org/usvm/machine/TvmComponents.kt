@@ -1,18 +1,13 @@
 package org.usvm.machine
 
-import io.ksmt.profiling.KRecordingSolverProfiler
-import io.ksmt.profiling.KSolverConfigurationBase
-import io.ksmt.profiling.KSolverConfigurationSnapshot
-import io.ksmt.profiling.KSolverConfigurationValue
-import io.ksmt.profiling.KSolverDescriptor
-import io.ksmt.profiling.KSolverProfiler
 import io.ksmt.solver.KSolver
 import io.ksmt.solver.KSolverConfiguration
 import io.ksmt.solver.KSolverStatus
 import io.ksmt.solver.KTheory
-import io.ksmt.solver.cvc5.KCvc5Solver
 import io.ksmt.solver.wrapper.bv2int.KBv2IntRewriter.SignednessMode
 import io.ksmt.solver.wrapper.bv2int.KBv2IntRewriterConfig
+import io.ksmt.solver.yices.KYicesSolver
+import io.ksmt.solver.z3.KZ3Solver
 import mu.KLogging
 import org.usvm.UBoolExpr
 import org.usvm.UBv32SizeExprProvider
@@ -36,8 +31,6 @@ import org.usvm.solver.UExprTranslator
 import org.usvm.solver.USolverBase
 import org.usvm.solver.UTypeSolver
 import org.usvm.types.UTypeSystem
-import java.util.UUID
-import java.util.concurrent.atomic.AtomicLong
 import kotlin.time.Duration
 
 class TvmComponents(
@@ -45,8 +38,6 @@ class TvmComponents(
 ) : UComponents<TvmType, TvmSizeSort>,
     AutoCloseable {
     private val closeableResources = mutableListOf<AutoCloseable>()
-    private val solverProfilers = mutableListOf<KSolverProfiler<*>>()
-    private val profileWriter = options.solverProfileOptions?.let { TvmSolverProfileWriter(it.outputDirectory) }
     override val useSolverForForks: Boolean
         get() = true
 
@@ -72,310 +63,46 @@ class TvmComponents(
 
     override fun <Context : UContext<TvmSizeSort>> mkSolver(ctx: Context): USolverBase<TvmType> {
         val (translator, decoder) = buildTranslatorAndLazyDecoder(ctx)
-        val wrappedSolver = mkKsmtSolver(ctx)
 
+        val solver = mkKsmtSolver(ctx)
         val typeSolver = UTypeSolver(typeSystem)
-        return USolverBase(ctx, wrappedSolver, typeSolver, translator, decoder, options.solverTimeout)
+        return USolverBase(ctx, solver, typeSolver, translator, decoder, options.solverTimeout)
     }
 
-    internal fun <Context : UContext<TvmSizeSort>> mkKsmtSolver(ctx: Context): KSolver<KSolverConfiguration> {
-        val profileOptions = options.solverProfileOptions
-        val pipelineInstanceId = UUID.randomUUID().toString()
-        val applicationProfileId = UUID.randomUUID().toString()
+    internal fun mkKsmtSolver(ctx: UContext<TvmSizeSort>): KSolver<KSolverConfiguration> {
+        val solver = options.solverFactory?.create(ctx, options) ?: createDefaultSolver(ctx)
+        closeableResources += solver
+        return solver
+    }
 
-        warnOnUnknownCvc5Options()
-
-        val bvConfiguration =
-            options.cvc5Configuration?.takeIf {
-                it.backendRole == TvmCvc5Configuration.REGULAR_BV_BACKEND
-            }
-        val intConfiguration =
-            options.cvc5Configuration?.takeIf {
-                it.backendRole == TvmCvc5Configuration.INTEGER_BLASTED_BACKEND
-            }
-
-        val rawBvSolver =
-            KCvc5Solver(ctx).apply {
+    private fun createDefaultSolver(ctx: UContext<TvmSizeSort>): KSolver<KSolverConfiguration> {
+        val bvSolver =
+            KYicesSolver(ctx).apply {
                 configure {
                     optimizeForTheories(setOf(KTheory.UF, KTheory.Array, KTheory.BV))
-                    bvConfiguration?.options?.toSortedMap()?.forEach { (option, value) ->
-                        setCvc5Option(option, value)
-                    }
                 }
             }
-        val rawIntSolver =
-            KCvc5Solver(ctx).apply {
+        val intSolver =
+            KZ3Solver(ctx).apply {
                 configure {
                     optimizeForTheories(setOf(KTheory.UF, KTheory.Array, KTheory.LIA, KTheory.NIA))
-                    intConfiguration?.options?.toSortedMap()?.forEach { (option, value) ->
-                        setCvc5Option(option, value)
-                    }
+                    setBoolParameter("auto_config", false)
+                    setBoolParameter("arith.nl.grobner", false)
+                    setBoolParameter("arith.nl.horner", false)
+                    setIntParameter("arith.nl.delay", 200)
+                    setBoolParameter("arith.nl.expensive_patching", true)
+                    setBoolParameter("arith.nl.expp", true)
+                    setBoolParameter("candidate_models", true)
                 }
             }
 
-        val bvSolver =
-            profileOptions?.let {
-                profileBackend(
-                    delegate = rawBvSolver,
-                    profileOptions = it,
-                    profileId = UUID.randomUUID().toString(),
-                    parentProfileId = applicationProfileId,
-                    pipelineInstanceId = pipelineInstanceId,
-                    backendRole = TvmCvc5Configuration.REGULAR_BV_BACKEND,
-                    theories = "UF,Array,BV",
-                    cvc5Options = bvConfiguration?.options.orEmpty(),
-                )
-            } ?: rawBvSolver
-        val intSolver =
-            profileOptions?.let {
-                profileBackend(
-                    delegate = rawIntSolver,
-                    profileOptions = it,
-                    profileId = UUID.randomUUID().toString(),
-                    parentProfileId = applicationProfileId,
-                    pipelineInstanceId = pipelineInstanceId,
-                    backendRole = TvmCvc5Configuration.INTEGER_BLASTED_BACKEND,
-                    theories = "UF,Array,LIA,NIA",
-                    cvc5Options = intConfiguration?.options.orEmpty(),
-                )
-            } ?: rawIntSolver
-
-        val solver =
-            Bv2IntSolverWrapper(
-                options = options,
-                bv2intSolver =
-                    TvmBv2IntSolver(
-                        ctx,
-                        intSolver,
-                        KBv2IntRewriterConfig(signednessMode = SignednessMode.SIGNED),
-                    ),
-                regularSolver = bvSolver,
-                exprFilter =
-                    Bv2IntExprFilter(
-                        ctx,
-                        excludeNonConstBvand = true,
-                        excludeNonConstShift = true,
-                        excludeNonlinearArith = false,
-                    ),
-                transformer = TvmBvNonRecursiveTransformer(ctx.tctx()),
-            )
-
-        val loggingSolver: KSolver<KSolverConfiguration> =
-            if (logger.isDebugEnabled) {
-                LoggingSolver(solver)
-            } else {
-                solver
-            }
-
-        val wrappedSolver =
-            profileOptions?.let {
-                KRecordingSolverProfiler(
-                    delegate = loggingSolver,
-                    solver =
-                        KSolverDescriptor(
-                            name = "tsa-bv2int",
-                            attributes =
-                                mapOf(
-                                    "pipeline" to "tsa-bv2int",
-                                    "regular-backend" to "cvc5",
-                                    "integer-backend" to "cvc5",
-                                ),
-                        ),
-                    profileId = applicationProfileId,
-                    runId = it.runId,
-                    initialConfiguration = applicationConfiguration(),
-                    profileAttributes =
-                        profileAttributes(
-                            profileOptions = it,
-                            pipelineInstanceId = pipelineInstanceId,
-                            layer = "application",
-                        ) +
-                            mapOf(
-                                "int-blasting-enabled" to options.useIntBlasting.toString(),
-                                TvmSolverProfileWriter.EXPRESSION_NORMALIZATION_ATTRIBUTE to
-                                    TvmSolverProfileWriter.TSA_BV_ARITHMETIC_NORMALIZATION,
-                            ),
-                    maxRecordedEvents = it.maxRecordedEvents,
-                ).also(solverProfilers::add)
-            } ?: loggingSolver
-
-        val checkpointingSolver =
-            profileOptions?.let {
-                CheckpointingSolver(wrappedSolver, it.checkpointIntervalChecks) {
-                    writeProfileSnapshots(terminal = false)
-                }
-            } ?: wrappedSolver
-
-        closeableResources += checkpointingSolver
-        return checkpointingSolver
-    }
-
-    private fun <Config : KSolverConfiguration> profileBackend(
-        delegate: KSolver<Config>,
-        profileOptions: TvmSolverProfileOptions,
-        profileId: String,
-        parentProfileId: String,
-        pipelineInstanceId: String,
-        backendRole: String,
-        theories: String,
-        cvc5Options: Map<String, String>,
-    ): KRecordingSolverProfiler<Config> =
-        KRecordingSolverProfiler(
-            delegate = delegate,
-            solver =
-                KSolverDescriptor(
-                    name = "cvc5",
-                    version = "1.3.4",
-                    attributes = mapOf("backend-role" to backendRole),
-                ),
-            profileId = profileId,
-            runId = profileOptions.runId,
-            parentProfileId = parentProfileId,
-            initialConfiguration = cvc5Configuration(theories, cvc5Options),
-            profileAttributes =
-                profileAttributes(
-                    profileOptions = profileOptions,
-                    pipelineInstanceId = pipelineInstanceId,
-                    layer = "backend",
-                ) +
-                    mapOf(
-                        "backend-role" to backendRole,
-                        TvmSolverProfileWriter.EXPRESSION_NORMALIZATION_ATTRIBUTE to
-                            TvmSolverProfileWriter.IDENTITY_NORMALIZATION,
-                    ) +
-                    cvc5ConfigurationAttributes(backendRole),
-            maxRecordedEvents = profileOptions.maxRecordedEvents,
-        ).also(solverProfilers::add)
-
-    /** Provenance of the applied configuration, so a captured workload stays explainable. */
-    private fun cvc5ConfigurationAttributes(backendRole: String): Map<String, String> =
-        options.cvc5Configuration
-            ?.takeIf { it.backendRole == backendRole }
-            ?.let { mapOf(CVC5_PARAMETER_SPACE_ATTRIBUTE to it.parameterSpaceId) }
-            .orEmpty()
-
-    /**
-     * Reports cvc5 options of the applied configuration that the loaded cvc5 build does not list.
-     *
-     * A parameter space owns option domains, and an inventory describes a single native library
-     * build, so this warns instead of rejecting: cvc5 itself decides whether the option is usable.
-     */
-    private fun warnOnUnknownCvc5Options() {
-        val configuration = options.cvc5Configuration ?: return
-        val unknown = TvmCvc5Configuration.unknownOptionNames(configuration.options, cvc5OptionInventory)
-        if (unknown.isEmpty()) return
-
-        logger.warn(
-            "cvc5 configuration sets options the loaded cvc5 build does not list: {}. " +
-                "cvc5 rejects an unknown option when the solver is initialized.",
-            unknown,
-        )
-    }
-
-    /** Read once, and only when a configuration is actually applied. */
-    private val cvc5OptionInventory: TvmCvc5OptionInventory by lazy { TvmCvc5OptionInventoryReader.read() }
-
-    private fun applicationConfiguration(): KSolverConfigurationSnapshot =
-        KSolverConfigurationSnapshot(
-            base = KSolverConfigurationBase.SOLVER_DEFAULTS,
-            overrides =
-                mapOf(
-                    "tsa.pipeline" to KSolverConfigurationValue.StringValue("bv2int"),
-                    "tsa.int-blasting-enabled" to KSolverConfigurationValue.BoolValue(options.useIntBlasting),
-                ),
-        )
-
-    /**
-     * The initial configuration recorded in a backend profile.
-     *
-     * Applied cvc5 options are part of it, because a replay reconstructs the workload from this
-     * snapshot: omitting them would make the replay measure a different workload than the capture.
-     */
-    private fun cvc5Configuration(
-        theories: String,
-        cvc5Options: Map<String, String>,
-    ): KSolverConfigurationSnapshot =
-        KSolverConfigurationSnapshot(
-            base = KSolverConfigurationBase.SOLVER_DEFAULTS,
-            overrides =
-                mapOf(
-                    TvmSolverProfileWriter.OPTIMIZE_THEORIES_CONFIGURATION_KEY to
-                        KSolverConfigurationValue.StringValue(theories),
-                    TvmSolverProfileWriter.QUANTIFIERS_ALLOWED_CONFIGURATION_KEY to
-                        KSolverConfigurationValue.BoolValue(false),
-                ) +
-                    cvc5Options.mapValues { (_, value) -> KSolverConfigurationValue.StringValue(value) },
-        )
-
-    private fun profileAttributes(
-        profileOptions: TvmSolverProfileOptions,
-        pipelineInstanceId: String,
-        layer: String,
-    ): Map<String, String> =
-        profileOptions.attributes +
-            buildMap {
-                put("producer", "tsa")
-                put("layer", layer)
-                put("pipeline-instance-id", pipelineInstanceId)
-                profileOptions.workloadId?.let { put("workload-id", it) }
-                put("environment.java-version", System.getProperty("java.version"))
-                put("environment.os-name", System.getProperty("os.name"))
-                put("environment.os-arch", System.getProperty("os.arch"))
-                put("environment.available-processors", Runtime.getRuntime().availableProcessors().toString())
-            }
-
-    private fun writeProfileSnapshots(terminal: Boolean) {
-        val writer = profileWriter ?: return
-        val onTerminalProfile = options.solverProfileOptions?.onTerminalProfile
-        solverProfilers.forEach { profiler ->
-            val snapshot = profiler.snapshot()
-            writer.write(snapshot)
-            if (terminal) {
-                // Profiling must never turn a successful analysis into a failed one.
-                runCatching { onTerminalProfile?.invoke(snapshot) }
-            }
-        }
+        return createTvmSolverPipeline(ctx, options, bvSolver, intSolver)
     }
 
     override fun mkTypeSystem(ctx: UContext<TvmSizeSort>): UTypeSystem<TvmType> = typeSystem
 
     override fun close() {
-        try {
-            closeableResources.forEach(AutoCloseable::close)
-        } finally {
-            writeProfileSnapshots(terminal = true)
-        }
-    }
-
-    private class CheckpointingSolver<Config : KSolverConfiguration>(
-        private val delegate: KSolver<Config>,
-        private val checkpointIntervalChecks: Int,
-        private val checkpoint: () -> Unit,
-    ) : KSolver<Config> by delegate {
-        private val completedChecks = AtomicLong()
-
-        override fun check(timeout: Duration): KSolverStatus =
-            try {
-                delegate.check(timeout)
-            } finally {
-                checkpointIfRequired()
-            }
-
-        override fun checkWithAssumptions(
-            assumptions: List<UBoolExpr>,
-            timeout: Duration,
-        ): KSolverStatus =
-            try {
-                delegate.checkWithAssumptions(assumptions, timeout)
-            } finally {
-                checkpointIfRequired()
-            }
-
-        private fun checkpointIfRequired() {
-            if (completedChecks.incrementAndGet() % checkpointIntervalChecks == 0L) {
-                checkpoint()
-            }
-        }
+        closeableResources.forEach(AutoCloseable::close)
     }
 
     class LoggingSolver<T : KSolverConfiguration>(
@@ -396,8 +123,40 @@ class TvmComponents(
     }
 
     companion object {
-        /** Profile attribute naming the parameter space the applied configuration came from. */
-        const val CVC5_PARAMETER_SPACE_ATTRIBUTE = "cvc5.parameter-space-id"
+        internal fun <Bv : KSolverConfiguration, Integer : KSolverConfiguration> createTvmSolverPipeline(
+            ctx: UContext<TvmSizeSort>,
+            options: TvmOptions,
+            bvSolver: KSolver<Bv>,
+            intSolver: KSolver<Integer>,
+            retryIntSolverOnUnknown: Boolean = true,
+        ): KSolver<KSolverConfiguration> {
+            val solver =
+                Bv2IntSolverWrapper(
+                    options = options,
+                    retryIntSolverOnUnknown = retryIntSolverOnUnknown,
+                    bv2intSolver =
+                        TvmBv2IntSolver(
+                            ctx,
+                            intSolver,
+                            KBv2IntRewriterConfig(signednessMode = SignednessMode.SIGNED),
+                        ),
+                    regularSolver = bvSolver,
+                    exprFilter =
+                        Bv2IntExprFilter(
+                            ctx,
+                            excludeNonConstBvand = true,
+                            excludeNonConstShift = true,
+                            excludeNonlinearArith = false,
+                        ),
+                    transformer = TvmBvNonRecursiveTransformer(ctx.tctx()),
+                )
+
+            return if (logger.isDebugEnabled) {
+                LoggingSolver(solver)
+            } else {
+                solver
+            }
+        }
 
         private val logger = object : KLogging() {}.logger
     }

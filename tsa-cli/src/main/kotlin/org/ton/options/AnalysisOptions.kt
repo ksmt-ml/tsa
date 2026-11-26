@@ -1,6 +1,5 @@
 package org.ton.options
 
-import com.github.ajalt.clikt.parameters.groups.OptionGroup
 import com.github.ajalt.clikt.parameters.options.default
 import com.github.ajalt.clikt.parameters.options.flag
 import com.github.ajalt.clikt.parameters.options.help
@@ -11,7 +10,7 @@ import com.github.ajalt.clikt.parameters.types.path
 import org.usvm.machine.TvmMachine.Companion.DEFAULT_LOOP_ITERATIONS_LIMIT
 import org.usvm.machine.TvmMachine.Companion.DEFAULT_MAX_RECURSION_DEPTH
 
-class AnalysisOptions : OptionGroup("Symbolic analysis options") {
+class AnalysisOptions : TuningOptions() {
     val analyzeBouncedMessages by option("--analyze-bounced-messages")
         .flag()
         .help("Consider inputs when the message is bounced.")
@@ -24,36 +23,6 @@ class AnalysisOptions : OptionGroup("Symbolic analysis options") {
         .int()
         .default(1)
         .help("Solver timeout in seconds. Default: 1.")
-
-    val solverProfileDirectory by option("--solver-profile-dir")
-        .path(canBeFile = false)
-        .help(
-            "Directory for v0 KSMT solver workload profiles. " +
-                "Profiling is disabled when this option is absent.",
-        )
-
-    val solverProfileRunId by option("--solver-profile-run-id")
-        .help("Stable run id used to link all solver profiles produced by one analysis.")
-
-    val solverProfileWorkloadId by option("--solver-profile-workload-id")
-        .help("Stable workload id used for grouped dataset splits and repeated evaluations.")
-
-    val solverProfileMaxEvents by option("--solver-profile-max-events")
-        .int()
-        .default(1_000_000)
-        .help("Maximum number of events retained by each solver profile. Default: 1000000.")
-
-    val solverProfileCheckpointInterval by option("--solver-profile-checkpoint-interval")
-        .int()
-        .default(100)
-        .help("Write an atomic in-progress snapshot after this many checks. Default: 100.")
-
-    val cvc5ConfigurationPath by option("--cvc5-configuration")
-        .path(mustExist = true, canBeFile = true, canBeDir = false)
-        .help(
-            "Path to a tsa-cvc5-configuration-v0 document with the cvc5 options applied to one " +
-                "backend role while its solver is constructed. The other role keeps the defaults.",
-        )
 
     val continueOnContractException by option("--continue-on-contract-exception")
         .flag()

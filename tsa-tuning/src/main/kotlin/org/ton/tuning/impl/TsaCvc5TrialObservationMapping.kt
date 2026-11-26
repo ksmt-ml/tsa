@@ -24,6 +24,13 @@ internal fun TvmCvc5ProfileReplayResult.toObservation(request: Cvc5TrialRequest)
     val cost: Double?
 
     when {
+        wrongAnswerCount > 0 -> {
+            status = Cvc5TrialStatus.WRONG_ANSWER
+            correctness = Cvc5TrialCorrectness.INCORRECT
+            censored = false
+            cost = null
+        }
+
         // A replay that outlived its trial budget is a censored observation, not a measurement of
         // the candidate. The tuner host additionally owns hard termination of a stuck evaluator.
         request.isBudgetExceeded(wallDurationNanos) -> {
@@ -36,13 +43,6 @@ internal fun TvmCvc5ProfileReplayResult.toObservation(request: Cvc5TrialRequest)
         outcome != REPLAY_OUTCOME_SUCCESS -> {
             status = Cvc5TrialStatus.INFRASTRUCTURE_FAILURE
             correctness = Cvc5TrialCorrectness.NOT_ESTABLISHED
-            censored = false
-            cost = null
-        }
-
-        wrongAnswerCount > 0 -> {
-            status = Cvc5TrialStatus.WRONG_ANSWER
-            correctness = Cvc5TrialCorrectness.INCORRECT
             censored = false
             cost = null
         }
@@ -93,6 +93,16 @@ internal fun Cvc5TrialRequest.infrastructureFailure(message: String): Cvc5TrialO
         censored = false,
         correctness = Cvc5TrialCorrectness.NOT_ESTABLISHED,
         attributes = mapOf("failure" to message),
+    )
+
+internal fun Cvc5TrialRequest.invalidConfigurationObservation(): Cvc5TrialObservation =
+    Cvc5TrialObservation(
+        requestId = requestId,
+        status = Cvc5TrialStatus.INVALID_CONFIGURATION,
+        cost = null,
+        duration = Duration.ZERO,
+        censored = false,
+        correctness = Cvc5TrialCorrectness.NOT_ESTABLISHED,
     )
 
 internal fun Cvc5TrialRequest.timedOutObservation(): Cvc5TrialObservation =

@@ -25,10 +25,8 @@ For cross-repository validation, place `ksmt`, `ksmt-ml-tuner`, and `tsa` next t
 each other and run:
 
 ```text
-../ksmt/gradlew -p . :tsa-tuning-api:check
+../ksmt/gradlew -p . -PuseLocalTuningContracts=true :tsa-tuning-api:check
 ```
 
-`io.ksmt:ksmt-profiling` and `io.ksmt:ksmt-ml-tuner` are not published to a
-public repository yet, so the sibling checkouts are required for any TSA build.
-The build must run on JDK 17: KSMT compiles its modules with `-Werror` and fails
-on newer JDKs.
+The flag enables the tuning modules and substitutes the sibling checkouts for
+the unpublished profiling and tuner artifacts. Run this build on JDK 17.

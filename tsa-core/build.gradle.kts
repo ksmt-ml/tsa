@@ -4,6 +4,12 @@ plugins {
     id("org.jmailen.kotlinter") version Versions.kotlinterPluginVersion
 }
 
+val tuningEnabled = providers.gradleProperty("useLocalTuningContracts").orNull == "true"
+if (tuningEnabled) {
+    kotlin.sourceSets.named("main") { kotlin.srcDir("src/tuning/kotlin") }
+    kotlin.sourceSets.named("test") { kotlin.srcDir("src/tuningTest/kotlin") }
+}
+
 dependencies {
     // these are used in TvmSymbolicTest which is then exported to Test module
     api(group = Packages.tvmDisasm, name = "tvm-disasm", version = Versions.tvmDisasm)
@@ -28,11 +34,15 @@ dependencies {
     testImplementation("ch.qos.logback:logback-classic:${Versions.logback}")
 
     api(group = Packages.ksmt, name = "ksmt-core", version = Versions.ksmt)
-    // TvmSolverProfileOptions exposes the KSMT profile contract to TSA consumers.
-    api(group = Packages.ksmt, name = "ksmt-profiling", version = Versions.ksmt)
-    implementation(group = Packages.ksmt, name = "ksmt-runner", version = Versions.ksmt)
+    if (tuningEnabled) {
+        api(group = Packages.ksmt, name = "ksmt-profiling", version = Versions.ksmtTuningContracts)
+        implementation(group = Packages.ksmt, name = "ksmt-runner", version = Versions.ksmtTuningContracts)
+        implementation(group = Packages.ksmt, name = "ksmt-cvc5", version = Versions.ksmtTuningContracts)
+        api("io.ksmt:ksmt-ml-tuner:${Versions.ksmtMlTuner}")
+    }
     implementation(group = Packages.ksmtBv2Int, name = "ksmt-bv2int", version = Versions.ksmtBv2Int)
-    implementation(group = Packages.ksmt, name = "ksmt-cvc5", version = Versions.ksmt)
+    implementation(group = Packages.ksmt, name = "ksmt-yices", version = Versions.ksmt)
+    implementation(group = Packages.ksmt, name = "ksmt-z3", version = Versions.ksmt)
     implementation("com.charleskorn.kaml:kaml:${Versions.kaml}")
 
     // todo: remove ksmt-core exclude after upgrading ksmt version in USVM
@@ -45,8 +55,8 @@ val pathToSpec = File(rootProject.projectDir, "tvm-spec/cp0.json")
 
 tasks.processResources {
     from(pathToSpec)
-    from("schemas") {
-        into("org/usvm/machine/schemas")
+    if (tuningEnabled) {
+        from("schemas") { into("org/usvm/machine/schemas") }
     }
 }
 

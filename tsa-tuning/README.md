@@ -1,12 +1,14 @@
 # tsa-tuning
 
-Production TSA-side implementation of the cvc5 tuning boundary declared in
+Opt-in TSA-side implementation of the cvc5 tuning boundary declared in
 [`tsa-tuning-api`](../tsa-tuning-api/README.md). It runs TSA analyses in-process
 and evaluates captured solver workloads; it never invokes TSA as a subprocess.
 
 The module depends on `tsa-core`, `tsa-tuning-api`, and the sibling `ksmt` and
 `ksmt-ml-tuner` checkouts. See [`CONTRIBUTING.md`](../CONTRIBUTING.md) for the
-required repository layout and JDK version.
+required repository layout and JDK version. Use
+`../ksmt/gradlew -p . -PuseLocalTuningContracts=true` for the commands on this page.
+The opt-in CLI uses cvc5 when given `--cvc5-tuning` or `--solver-profile-dir`.
 
 ## ML team quickstart
 
@@ -80,7 +82,7 @@ capture without writing any code, use the
 [end-to-end harness](#end-to-end-mvp-harness):
 
 ```bash
-./gradlew :tsa-tuning:runTuningMvp \
+../ksmt/gradlew -p . -PuseLocalTuningContracts=true :tsa-tuning:runTuningMvp \
   -Pcontract=tsa-test/src/test/resources/demo/boc/integer-underflow.boc \
   -Pcandidates=6
 ```
@@ -109,44 +111,26 @@ freshly captured workload is immediately resolvable.
 
 ### 4. Apply an accepted configuration to a real analysis
 
-Write the accepted `Cvc5ValidatedConfigurationPatch` as a
-`tsa-cvc5-configuration-v0` document, starting from
-[`examples/cvc5-configuration.json`](examples/cvc5-configuration.json):
+An application can load a
+[`tsa-cvc5-configuration-v0`](../tsa-core/schemas/tsa-cvc5-configuration-v0.schema.json)
+document and pass an approved tuner parameter space. Validation binds the patch
+to the runtime cvc5 version and backend role before it can configure a solver.
 
-```json
-{
-  "schemaVersion": "tsa-cvc5-configuration-v0",
-  "parameterSpaceId": "cvc5-1.3.4-regular-bv-wide-v0",
-  "backendRole": "regular-bv",
-  "options": { "solve-bv-as-int": "bitwise" }
-}
+```kotlin
+val document = TsaCvc5ConfigurationDocument.load(configPath)
+val configuration = document.validate(approvedParameterSpace)
+val tunedOptions = options.copy(
+    solverFactory = TvmCvc5SolverFactory(configuration = configuration),
+)
 ```
 
-```bash
-java -jar tsa-cli.jar boc -i contract.boc \
-  --cvc5-configuration cvc5-configuration.json -o tuned.sarif
-```
+The factory configures a fresh solver for the selected role before its first
+assertion. The other cvc5 backend uses its default settings. Capture records the
+applied options so replay can reproduce the initial configuration.
 
-`--cvc5-configuration` is accepted by every analysis command: `boc`, `func`,
-`tact`, `fift`, `checker`, `compiled-checker`, `inter-contract`, and `test-gen`.
-Only the named backend role is configured, so the other role keeps the defaults,
-and the applied options are recorded in the captured profile so that replaying
-that profile reproduces exactly the configuration it was captured with.
-
-The document is validated structurally, and TSA refuses the option names it owns
-itself, because they would make a captured profile unreplayable or make costs
-incomparable:
-
-| Refused | Why |
-| --- | --- |
-| `logic` | the analysis and the replay set the logic themselves |
-| `tlimit-per` | the per-check timeout belongs to the evaluator |
-| `produce-models`, `produce-unsat-cores`, `incremental`, `arrays-exp`, `fp-exp` | the evaluator depends on their values |
-| `ksmt.optimize.theories`, `ksmt.quantifiers-allowed` | KSMT writes its own keys into the same override map |
-
-An option name the loaded cvc5 build does not list is reported as a warning rather
-than rejected: a parameter space owns option domains, and an inventory describes
-one native library build.
+The tuning CLI builds and captures default cvc5 workloads and can replay
+offline candidates. Applying a document to full analysis is a JVM integration
+point until there is a loader for the approved parameter space.
 
 ## Workload layout
 
@@ -209,13 +193,13 @@ the tuner host, which owns process isolation.
 
 ## End-to-end MVP harness
 
-`./gradlew :tsa-tuning:runTuningMvp -Pcontract=<path-to.boc>` runs the whole TSA
+`../ksmt/gradlew -p . -PuseLocalTuningContracts=true :tsa-tuning:runTuningMvp -Pcontract=<path-to.boc>` runs the whole TSA
 side of the loop on a real contract: it writes a workload descriptor, captures
 profiles, resolves them back into a workload, and measures the default cvc5
 configuration against randomly proposed ones.
 
 ```bash
-./gradlew :tsa-tuning:runTuningMvp \
+../ksmt/gradlew -p . -PuseLocalTuningContracts=true :tsa-tuning:runTuningMvp \
   -Pcontract=tsa-test/src/test/resources/demo/boc/integer-underflow.boc \
   -Pcandidates=4 -PmethodTimeoutSeconds=20
 ```
@@ -245,14 +229,12 @@ belong to `ksmt-ml-tuner`.
 
 ## Known limitations
 
-- **Replay measures the cvc5 backend, not the whole analysis.** A replay reports the cost of the
-  captured solver sessions. To measure the effect on a full analysis, run it twice with and without
-  `--cvc5-configuration` and compare wall time plus the SARIF report; only the witness input values
-  should differ.
-- **The parameter space is still a stub.** `ksmt-ml-tuner` ships `Cvc5ParameterSpaceImpl`, which
-  validates structure but not option domains, and no `Cvc5ParameterSpaceLoader` implementation
-  exists. TSA therefore warns about option names the loaded cvc5 build does not list instead of
-  rejecting them, and cvc5 itself rejects an unknown option when the solver is initialized.
+- **Replay measures solver sessions.** End-to-end performance requires running
+  the full analyzer with the approved configuration and with cvc5 defaults,
+  then comparing elapsed time and analysis findings.
+- **The MVP harness uses a smoke parameter space.** Full-analysis callers
+  supply an approved `Cvc5ParameterSpace` that validates option domains and
+  interactions. A deployable loader for the provider document remains open.
 - **The ML-side providers are not implemented yet.** `ksmt-ml-tuner` contains the inference pipeline
   and deterministic stubs; it has no `Cvc5ConfigurationSearch` implementation, no ONNX adapter, and
   no search worker, and `ksmt-ml` publishes neither artifact on this branch.

@@ -60,6 +60,10 @@ class TsaCvc5ProfileReplayWorkload(
             return request.timedOutObservation()
         }
 
+        if (request.solverVersion != solverVersion || request.configuration.parameterSpaceId != parameterSpaceId) {
+            return request.invalidConfigurationObservation()
+        }
+
         val profile =
             profilesByInstanceId[request.instanceId]
                 ?: return request.infrastructureFailure("Unknown workload instance: ${request.instanceId}")

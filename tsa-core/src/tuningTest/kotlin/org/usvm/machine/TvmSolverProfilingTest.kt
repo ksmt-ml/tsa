@@ -32,7 +32,7 @@ class TvmSolverProfilingTest {
         val outputDirectory = Files.createTempDirectory("tsa-cvc5-profile-test")
         val options =
             TvmOptions(
-                solverProfileOptions = TvmSolverProfileOptions(outputDirectory),
+                solverFactory = TvmCvc5SolverFactory(TvmSolverProfileOptions(outputDirectory)),
             )
         val components = TvmComponents(options)
         val ctx = TvmContext(options, components)
@@ -121,10 +121,13 @@ class TvmSolverProfilingTest {
         val emitted = mutableListOf<KSolverProfile>()
         val options =
             TvmOptions(
-                solverProfileOptions =
-                    TvmSolverProfileOptions(
-                        outputDirectory,
-                        onTerminalProfile = { emitted += it },
+                solverFactory =
+                    TvmCvc5SolverFactory(
+                        profileOptions =
+                            TvmSolverProfileOptions(
+                                outputDirectory,
+                                onTerminalProfile = { emitted += it },
+                            ),
                     ),
             )
         val components = TvmComponents(options)
@@ -171,16 +174,19 @@ class TvmSolverProfilingTest {
         val emitted = mutableListOf<KSolverProfile>()
         val options =
             TvmOptions(
-                solverProfileOptions =
-                    TvmSolverProfileOptions(
-                        outputDirectory,
-                        onTerminalProfile = { emitted += it },
-                    ),
-                cvc5Configuration =
-                    TvmCvc5Configuration(
-                        backendRole = TvmCvc5Configuration.REGULAR_BV_BACKEND,
-                        parameterSpaceId = "test-space-v0",
-                        options = mapOf("bv-solver" to "bitblast-internal"),
+                solverFactory =
+                    TvmCvc5SolverFactory(
+                        profileOptions =
+                            TvmSolverProfileOptions(
+                                outputDirectory,
+                                onTerminalProfile = { emitted += it },
+                            ),
+                        configuration =
+                            TvmCvc5Configuration(
+                                backendRole = TvmCvc5Configuration.REGULAR_BV_BACKEND,
+                                parameterSpaceId = "test-space-v0",
+                                options = mapOf("bv-solver" to "bitblast-internal"),
+                            ),
                     ),
             )
         val components = TvmComponents(options)
@@ -211,11 +217,11 @@ class TvmSolverProfilingTest {
                 KSolverConfigurationValue.StringValue("bitblast-internal"),
                 regularBv.initialConfiguration.overrides["bv-solver"],
             )
-            assertEquals("test-space-v0", regularBv.attributes[TvmComponents.CVC5_PARAMETER_SPACE_ATTRIBUTE])
+            assertEquals("test-space-v0", regularBv.attributes[TvmCvc5SolverFactory.CVC5_PARAMETER_SPACE_ATTRIBUTE])
 
             val integerBlasted = backends.single { it.solver.attributes["backend-role"] == "integer-blasted" }
             assertNull(integerBlasted.initialConfiguration.overrides["bv-solver"])
-            assertNull(integerBlasted.attributes[TvmComponents.CVC5_PARAMETER_SPACE_ATTRIBUTE])
+            assertNull(integerBlasted.attributes[TvmCvc5SolverFactory.CVC5_PARAMETER_SPACE_ATTRIBUTE])
         } finally {
             outputDirectory.toFile().deleteRecursively()
         }

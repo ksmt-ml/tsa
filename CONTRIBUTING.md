@@ -2,23 +2,18 @@
 
 GitHub CI builds, tests and performs linter checks on the project.
 
-## Repository layout and JDK
+## Optional cvc5 tuning build
 
-TSA is built together with two sibling repositories, which must be checked out
-next to the TSA repository:
+For local integration work, place the `ksmt`, `ksmt-ml-tuner`, and `tsa`
+checkouts in one directory. With JDK 17, run the following from `tsa`:
 
-```text
-<workspace>/
-├── ksmt           # https://github.com/ksmt-ml/ksmt
-├── ksmt-ml-tuner  # https://github.com/ksmt-ml/ksmt-ml-tuner
-└── tsa            # this repository
+```bash
+../ksmt/gradlew -p . -PuseLocalTuningContracts=true :tsa-tuning-api:check :tsa-tuning:check :tsa-cli:shadowJar
 ```
 
-They provide `io.ksmt:ksmt-profiling` and `io.ksmt:ksmt-ml-tuner`, which are not
-published to a public repository yet, so any TSA build requires them.
-
-The build must run on **JDK 17** (`JAVA_HOME` must point to it). KSMT compiles
-its modules with `-Werror` and does not build on newer JDKs.
+The flag enables local composite builds for the unpublished profiling and tuner
+artifacts. The ordinary commands below use dependencies from the repositories
+declared in the standard build.
 
 ## How to build CLI tool
 

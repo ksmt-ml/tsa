@@ -13,6 +13,7 @@ import org.ton.tuning.TsaSolverProfileSink
 import org.usvm.machine.BocAnalyzer
 import org.usvm.machine.TvmContext.Companion.RECEIVE_EXTERNAL_ID
 import org.usvm.machine.TvmContext.Companion.RECEIVE_INTERNAL_ID
+import org.usvm.machine.TvmCvc5SolverFactory
 import org.usvm.machine.TvmOptions
 import org.usvm.machine.TvmSolverProfileOptions
 import org.usvm.machine.TvmSolverProfileWriter
@@ -217,14 +218,17 @@ private fun tvmOptions(
         loopIterationLimit = workload.iterationLimit,
         shortResolve = workload.shortResolve,
         ignoreLowPriorityStates = !workload.analyzeLowPriorityStates,
-        solverProfileOptions =
-            TvmSolverProfileOptions(
-                outputDirectory = profilesDirectory,
-                runId = request.runId,
-                workloadId = request.workload.workloadId,
-                maxRecordedEvents = request.maxRecordedEventsPerProfile,
-                checkpointIntervalChecks = DEFAULT_CHECKPOINT_INTERVAL_CHECKS,
-                attributes = request.attributes,
-                onTerminalProfile = sink::accept,
+        solverFactory =
+            TvmCvc5SolverFactory(
+                profileOptions =
+                    TvmSolverProfileOptions(
+                        outputDirectory = profilesDirectory,
+                        runId = request.runId,
+                        workloadId = request.workload.workloadId,
+                        maxRecordedEvents = request.maxRecordedEventsPerProfile,
+                        checkpointIntervalChecks = DEFAULT_CHECKPOINT_INTERVAL_CHECKS,
+                        attributes = request.attributes,
+                        onTerminalProfile = sink::accept,
+                    ),
             ),
     )
