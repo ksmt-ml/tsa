@@ -1,0 +1,12 @@
+{
+  "schemaVersion": "tsa-analysis-workload-v0",
+  "workloadId": "integer-underflow-receivers",
+  "revision": "r1",
+  "sourceKind": "boc",
+  "sourcePath": "tsa-test/src/test/resources/demo/boc/integer-underflow.boc",
+  "targetKind": "receivers",
+  "methodTimeoutSeconds": 60,
+  "solverTimeoutSeconds": 5,
+  "iterationLimit": 6,
+  "maxRecursionDepth": 5
+}

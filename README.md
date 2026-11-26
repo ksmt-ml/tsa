@@ -18,6 +18,15 @@ TSA is designed for a few purposes:
 - Generate regression tests: TSA is able to generate Blueprint-based tests based on discovered execution paths that allow to fix expected behavior and find errorneous executions.
 - Honeypots detection: TSA can detect and report malicious contracts that are created to fool users.
 
+### cvc5 tuning
+
+The standard TSA build uses Yices for regular bit-vector queries and Z3 for
+integer-blasted queries. To build the optional cvc5 capture and replay tools,
+follow the [tuning build instructions](CONTRIBUTING.md#optional-cvc5-tuning-build).
+In that build, `--cvc5-tuning` or `--solver-profile-dir` explicitly selects cvc5
+for an analysis. See the [tuning API walkthrough](tsa-tuning/README.md) for
+calling capture and replay from the JVM.
+
 ### Funding
 TSA has been funded by the [TON Foundation grant](https://github.com/ton-society/grants-and-bounties/issues/489) grant and has been developed under the [8-month roadmap](https://questbook.app/dashboard/?proposalId=667ee6b9b59d3e9ae042d6c9&chainId=10&role=builder&isRenderingProposalBody=true&grantId=65c7836df27e2e1702d2d279).
 

@@ -18,6 +18,7 @@ class Bv2IntSolverWrapper<C1 : KSolverConfiguration, C2 : KSolverConfiguration>(
     private val regularSolver: KSolver<C2>,
     private val exprFilter: KNonRecursiveVisitor<Boolean>,
     private val transformer: TvmBvNonRecursiveTransformer,
+    private val retryIntSolverOnUnknown: Boolean = true,
 ) : KSolver<KSolverConfiguration> {
     private val assertions = mutableListOf<KExpr<KBoolSort>>()
     private val trackedAssertions = mutableListOf<KExpr<KBoolSort>>()
@@ -173,7 +174,7 @@ class Bv2IntSolverWrapper<C1 : KSolverConfiguration, C2 : KSolverConfiguration>(
 
         if (options.useIntBlasting) {
             val result = check()
-            if (result != KSolverStatus.UNKNOWN) return result
+            if (result != KSolverStatus.UNKNOWN || !retryIntSolverOnUnknown) return result
 
             // Retry with different random seeds to stabilize NLA solving
             for (retrySeed in RETRY_SEEDS) {

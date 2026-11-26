@@ -11,6 +11,7 @@ import org.ton.commands.InterContractAnalysis
 import org.ton.commands.OpcodeExtraction
 import org.ton.commands.TactAnalysis
 import org.ton.commands.TestGeneration
+import org.ton.options.tuningCommands
 
 class TonAnalysis : NoOpCliktCommand()
 
@@ -26,4 +27,5 @@ fun main(args: Array<String>) =
             InterContractAnalysis(),
             CompiledCheckerAnalysis(),
             OpcodeExtraction(),
+            *tuningCommands(),
         ).main(args)

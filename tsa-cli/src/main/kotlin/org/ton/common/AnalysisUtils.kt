@@ -11,6 +11,7 @@ import org.ton.options.Receivers
 import org.ton.options.SarifOptions
 import org.ton.options.SpecificMethod
 import org.ton.options.TlbCLIOptions
+import org.ton.options.cvc5SolverFactory
 import org.usvm.machine.ExploreExitCodesStopStrategy
 import org.usvm.machine.FollowTrace
 import org.usvm.machine.IntercontractOptions
@@ -81,6 +82,7 @@ private fun createTvmOptions(
                 } else {
                     TvmPathSelectionStrategy.DFS_BASED
                 },
+            solverFactory = analysisOptions.cvc5SolverFactory(),
         )
 
     if (interContractSchemePath != null) {

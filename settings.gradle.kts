@@ -1,5 +1,12 @@
 rootProject.name = "tsa"
 
+pluginManagement {
+    repositories {
+        mavenCentral()
+        gradlePluginPortal()
+    }
+}
+
 when (val useLocalTuningContracts = providers.gradleProperty("useLocalTuningContracts").orNull) {
     null, "false" -> Unit
     "true" -> {
@@ -11,18 +18,9 @@ when (val useLocalTuningContracts = providers.gradleProperty("useLocalTuningCont
         includeBuild(localKsmt)
         includeBuild(localTuner)
         include("tsa-tuning-api")
+        include("tsa-tuning")
     }
-    else -> error(
-        "Gradle property useLocalTuningContracts must be either true or false, " +
-            "got: $useLocalTuningContracts",
-    )
-}
-
-pluginManagement {
-    repositories {
-        mavenCentral()
-        gradlePluginPortal()
-    }
+    else -> error("Gradle property useLocalTuningContracts must be either true or false, got: $useLocalTuningContracts")
 }
 
 include("tsa-core")

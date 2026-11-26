@@ -2,6 +2,19 @@
 
 GitHub CI builds, tests and performs linter checks on the project.
 
+## Optional cvc5 tuning build
+
+For local integration work, place the `ksmt`, `ksmt-ml-tuner`, and `tsa`
+checkouts in one directory. With JDK 17, run the following from `tsa`:
+
+```bash
+../ksmt/gradlew -p . -PuseLocalTuningContracts=true :tsa-tuning-api:check :tsa-tuning:check :tsa-cli:shadowJar
+```
+
+The flag enables local composite builds for the unpublished profiling and tuner
+artifacts. The ordinary commands below use dependencies from the repositories
+declared in the standard build.
+
 ## How to build CLI tool
 
 1. Clone this repo (using `IntelliJ Idea` or `git clone https://github.com/espritoxyz/tsa`).

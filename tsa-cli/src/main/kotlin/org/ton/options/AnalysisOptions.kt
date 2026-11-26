@@ -1,6 +1,5 @@
 package org.ton.options
 
-import com.github.ajalt.clikt.parameters.groups.OptionGroup
 import com.github.ajalt.clikt.parameters.options.default
 import com.github.ajalt.clikt.parameters.options.flag
 import com.github.ajalt.clikt.parameters.options.help
@@ -11,7 +10,7 @@ import com.github.ajalt.clikt.parameters.types.path
 import org.usvm.machine.TvmMachine.Companion.DEFAULT_LOOP_ITERATIONS_LIMIT
 import org.usvm.machine.TvmMachine.Companion.DEFAULT_MAX_RECURSION_DEPTH
 
-class AnalysisOptions : OptionGroup("Symbolic analysis options") {
+class AnalysisOptions : TuningOptions() {
     val analyzeBouncedMessages by option("--analyze-bounced-messages")
         .flag()
         .help("Consider inputs when the message is bounced.")

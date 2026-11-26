@@ -7,6 +7,11 @@ plugins {
     id("org.jmailen.kotlinter") version Versions.kotlinterPluginVersion
 }
 
+val tuningEnabled = providers.gradleProperty("useLocalTuningContracts").orNull == "true"
+kotlin.sourceSets.named("main") {
+    kotlin.srcDir(if (tuningEnabled) "src/tuning/kotlin" else "src/standard/kotlin")
+}
+
 dependencies {
     implementation(group = Packages.tvmDisasm, name = "tvm-disasm", version = Versions.tvmDisasm)
     implementation(group = Packages.tvmDisasm, name = "tvm-opcodes", version = Versions.tvmDisasm)

@@ -1,0 +1,31 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://ksmt.io/schemas/tsa-analysis-workload-v0.schema.json",
+  "title": "TSA analysis workload",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "workloadId",
+    "revision",
+    "sourceKind",
+    "sourcePath",
+    "methodTimeoutSeconds"
+  ],
+  "properties": {
+    "schemaVersion": { "const": "tsa-analysis-workload-v0" },
+    "workloadId": { "type": "string", "minLength": 1 },
+    "revision": { "type": "string", "minLength": 1 },
+    "sourceKind": { "enum": ["boc", "func"] },
+    "sourcePath": { "type": "string", "minLength": 1 },
+    "fiftStdlibPath": { "type": "string", "minLength": 1 },
+    "targetKind": { "enum": ["receivers", "all-methods", "method"] },
+    "methodId": { "type": "string", "pattern": "^-?[0-9]+$" },
+    "methodTimeoutSeconds": { "type": "integer", "minimum": 1 },
+    "solverTimeoutSeconds": { "type": "integer", "minimum": 1, "default": 5 },
+    "iterationLimit": { "type": ["integer", "null"], "minimum": 1 },
+    "maxRecursionDepth": { "type": ["integer", "null"], "minimum": 0 },
+    "shortResolve": { "type": "boolean", "default": false },
+    "analyzeLowPriorityStates": { "type": "boolean", "default": false }
+  }
+}

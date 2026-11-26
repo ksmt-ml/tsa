@@ -64,6 +64,18 @@ class TvmComponents(
     override fun <Context : UContext<TvmSizeSort>> mkSolver(ctx: Context): USolverBase<TvmType> {
         val (translator, decoder) = buildTranslatorAndLazyDecoder(ctx)
 
+        val solver = mkKsmtSolver(ctx)
+        val typeSolver = UTypeSolver(typeSystem)
+        return USolverBase(ctx, solver, typeSolver, translator, decoder, options.solverTimeout)
+    }
+
+    internal fun mkKsmtSolver(ctx: UContext<TvmSizeSort>): KSolver<KSolverConfiguration> {
+        val solver = options.solverFactory?.create(ctx, options) ?: createDefaultSolver(ctx)
+        closeableResources += solver
+        return solver
+    }
+
+    private fun createDefaultSolver(ctx: UContext<TvmSizeSort>): KSolver<KSolverConfiguration> {
         val bvSolver =
             KYicesSolver(ctx).apply {
                 configure {
@@ -84,37 +96,7 @@ class TvmComponents(
                 }
             }
 
-        val solver =
-            Bv2IntSolverWrapper(
-                options = options,
-                bv2intSolver =
-                    TvmBv2IntSolver(
-                        ctx,
-                        intSolver,
-                        KBv2IntRewriterConfig(signednessMode = SignednessMode.SIGNED),
-                    ),
-                regularSolver = bvSolver,
-                exprFilter =
-                    Bv2IntExprFilter(
-                        ctx,
-                        excludeNonConstBvand = true,
-                        excludeNonConstShift = true,
-                        excludeNonlinearArith = false,
-                    ),
-                transformer = TvmBvNonRecursiveTransformer(ctx.tctx()),
-            )
-
-        val wrappedSolver =
-            if (logger.isDebugEnabled) {
-                LoggingSolver(solver)
-            } else {
-                solver
-            }
-
-        closeableResources += solver
-
-        val typeSolver = UTypeSolver(typeSystem)
-        return USolverBase(ctx, wrappedSolver, typeSolver, translator, decoder, options.solverTimeout)
+        return createTvmSolverPipeline(ctx, options, bvSolver, intSolver)
     }
 
     override fun mkTypeSystem(ctx: UContext<TvmSizeSort>): UTypeSystem<TvmType> = typeSystem
@@ -141,6 +123,41 @@ class TvmComponents(
     }
 
     companion object {
+        internal fun <Bv : KSolverConfiguration, Integer : KSolverConfiguration> createTvmSolverPipeline(
+            ctx: UContext<TvmSizeSort>,
+            options: TvmOptions,
+            bvSolver: KSolver<Bv>,
+            intSolver: KSolver<Integer>,
+            retryIntSolverOnUnknown: Boolean = true,
+        ): KSolver<KSolverConfiguration> {
+            val solver =
+                Bv2IntSolverWrapper(
+                    options = options,
+                    retryIntSolverOnUnknown = retryIntSolverOnUnknown,
+                    bv2intSolver =
+                        TvmBv2IntSolver(
+                            ctx,
+                            intSolver,
+                            KBv2IntRewriterConfig(signednessMode = SignednessMode.SIGNED),
+                        ),
+                    regularSolver = bvSolver,
+                    exprFilter =
+                        Bv2IntExprFilter(
+                            ctx,
+                            excludeNonConstBvand = true,
+                            excludeNonConstShift = true,
+                            excludeNonlinearArith = false,
+                        ),
+                    transformer = TvmBvNonRecursiveTransformer(ctx.tctx()),
+                )
+
+            return if (logger.isDebugEnabled) {
+                LoggingSolver(solver)
+            } else {
+                solver
+            }
+        }
+
         private val logger = object : KLogging() {}.logger
     }
 }

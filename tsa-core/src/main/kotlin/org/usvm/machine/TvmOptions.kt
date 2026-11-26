@@ -1,6 +1,9 @@
 package org.usvm.machine
 
+import io.ksmt.solver.KSolver
+import io.ksmt.solver.KSolverConfiguration
 import org.ton.TvmContractHandlers
+import org.usvm.UContext
 import org.usvm.machine.TvmMachine.Companion.DEFAULT_LOOP_ITERATIONS_LIMIT
 import org.usvm.machine.TvmMachine.Companion.DEFAULT_MAX_CELL_DEPTH_FOR_DEFAULT_CELLS_CONSISTENT_WITH_TLB
 import org.usvm.machine.TvmMachine.Companion.DEFAULT_MAX_RECURSION_DEPTH
@@ -62,6 +65,8 @@ data class TvmOptions(
     val enumeratingModelsCountLimit: Int = 5,
     val ignoreLowPriorityStates: Boolean = false,
     val forkOnEachPossibleElementInDictGet: Boolean = false,
+    /** Explicit solver pipeline for integrations such as cvc5 tuning. */
+    val solverFactory: TvmSolverFactory? = null,
 ) {
     init {
         check(enableOutMessageAnalysis || !intercontractOptions.isIntercontractEnabled) {
@@ -74,6 +79,13 @@ data class TvmOptions(
             "Cannot use strategy [addTimeoutIfNotSatiated] together with [divideTimeBetweenOpcodes]"
         }
     }
+}
+
+fun interface TvmSolverFactory {
+    fun create(
+        ctx: UContext<TvmSizeSort>,
+        options: TvmOptions,
+    ): KSolver<KSolverConfiguration>
 }
 
 data class TimeDivisionBetweenOpcodes(
