@@ -32,10 +32,14 @@ are the same root, so a captured workload is immediately resolvable.
 
 - resolves the descriptor through `TsaAnalysisWorkloadCatalog` and fails closed
   when it is missing or invalid;
+- refuses to capture into a workload revision that already holds profiles,
+  because a revision is immutable and mixing runs would change the measured
+  workload;
 - runs the analysis with KSMT profiling enabled and emits every terminal
   `KSolverProfile` to the sink, in addition to the profile JSON artifacts;
-- splits the requested timeout between the remaining methods, because TSA
-  applies its own timeout to every method independently;
+- gives each method the smaller of the workload's method timeout and its share
+  of the remaining launch budget, because TSA applies its own timeout to every
+  method independently;
 - stops at a method boundary on cancellation or deadline and reports the
   captured and failed profile counts.
 
@@ -62,6 +66,42 @@ Replay results map to `Cvc5TrialObservation` as follows:
 
 Only the first row is rankable. Hard termination of a stuck evaluator belongs to
 the tuner host, which owns process isolation.
+
+## End-to-end MVP harness
+
+`./gradlew :tsa-tuning:runTuningMvp -Pcontract=<path-to.boc>` runs the whole TSA
+side of the loop on a real contract: it writes a workload descriptor, captures
+profiles, resolves them back into a workload, and measures the default cvc5
+configuration against randomly proposed ones.
+
+```bash
+./gradlew :tsa-tuning:runTuningMvp \
+  -Pcontract=tsa-test/src/test/resources/demo/boc/integer-underflow.boc \
+  -Pcandidates=4 -PmethodTimeoutSeconds=20
+```
+
+| Property | Default | Meaning |
+| --- | --- | --- |
+| `contract` | required | BoC contract to analyze |
+| `workDir` | `build/mvp-tuning` | Descriptor and profile root; wiped before each run |
+| `candidates` | `6` | Randomly proposed configurations |
+| `methodTimeoutSeconds` | `60` | TSA timeout per method |
+| `solverTimeoutSeconds` | `5` | cvc5 timeout per check |
+| `trialTimeoutSeconds` | `120` | Budget of one trial |
+| `seed` | `17` | Candidate sampling seed |
+| `targetKind` | `receivers` | `receivers` or `all-methods` |
+| `iterationLimit` | `6` | `unlimited` removes the limit |
+| `maxRecursionDepth` | `5` | `unlimited` removes the limit |
+
+Candidates are sampled from the option inventory of the loaded native library, so
+only options that exist in this exact cvc5 build are proposed. The reported score
+is the geometric mean of per-instance costs normalized by the baseline; below
+`1.0` is faster. An instance that timed out contributes a PAR10-like penalty, and
+a candidate with any wrong answer or unresolved instance is never selected.
+
+The harness deliberately uses the stub `Cvc5ParameterSpaceImpl` and only the TSA
+side of the loop: the production search host and a real parameter-space document
+belong to `ksmt-ml-tuner`.
 
 ## Scope
 
