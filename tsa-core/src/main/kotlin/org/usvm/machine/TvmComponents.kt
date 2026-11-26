@@ -83,6 +83,8 @@ class TvmComponents(
         val pipelineInstanceId = UUID.randomUUID().toString()
         val applicationProfileId = UUID.randomUUID().toString()
 
+        warnOnUnknownCvc5Options()
+
         val bvConfiguration =
             options.cvc5Configuration?.takeIf {
                 it.backendRole == TvmCvc5Configuration.REGULAR_BV_BACKEND
@@ -252,6 +254,27 @@ class TvmComponents(
             ?.let { mapOf(CVC5_PARAMETER_SPACE_ATTRIBUTE to it.parameterSpaceId) }
             .orEmpty()
 
+    /**
+     * Reports cvc5 options of the applied configuration that the loaded cvc5 build does not list.
+     *
+     * A parameter space owns option domains, and an inventory describes a single native library
+     * build, so this warns instead of rejecting: cvc5 itself decides whether the option is usable.
+     */
+    private fun warnOnUnknownCvc5Options() {
+        val configuration = options.cvc5Configuration ?: return
+        val unknown = TvmCvc5Configuration.unknownOptionNames(configuration.options, cvc5OptionInventory)
+        if (unknown.isEmpty()) return
+
+        logger.warn(
+            "cvc5 configuration sets options the loaded cvc5 build does not list: {}. " +
+                "cvc5 rejects an unknown option when the solver is initialized.",
+            unknown,
+        )
+    }
+
+    /** Read once, and only when a configuration is actually applied. */
+    private val cvc5OptionInventory: TvmCvc5OptionInventory by lazy { TvmCvc5OptionInventoryReader.read() }
+
     private fun applicationConfiguration(): KSolverConfigurationSnapshot =
         KSolverConfigurationSnapshot(
             base = KSolverConfigurationBase.SOLVER_DEFAULTS,
@@ -276,8 +299,10 @@ class TvmComponents(
             base = KSolverConfigurationBase.SOLVER_DEFAULTS,
             overrides =
                 mapOf(
-                    "ksmt.optimize.theories" to KSolverConfigurationValue.StringValue(theories),
-                    "ksmt.quantifiers-allowed" to KSolverConfigurationValue.BoolValue(false),
+                    TvmSolverProfileWriter.OPTIMIZE_THEORIES_CONFIGURATION_KEY to
+                        KSolverConfigurationValue.StringValue(theories),
+                    TvmSolverProfileWriter.QUANTIFIERS_ALLOWED_CONFIGURATION_KEY to
+                        KSolverConfigurationValue.BoolValue(false),
                 ) +
                     cvc5Options.mapValues { (_, value) -> KSolverConfigurationValue.StringValue(value) },
         )

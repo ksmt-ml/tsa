@@ -10,9 +10,24 @@
     "parameterSpaceId": { "type": "string", "minLength": 1 },
     "backendRole": { "enum": ["regular-bv", "integer-blasted"] },
     "options": {
+      "description": "cvc5 options to set on the named backend role. Evaluator- and KSMT-controlled names are refused.",
       "type": "object",
       "minProperties": 1,
-      "propertyNames": { "not": { "const": "logic" } },
+      "propertyNames": {
+        "not": {
+          "enum": [
+            "logic",
+            "tlimit-per",
+            "produce-models",
+            "produce-unsat-cores",
+            "incremental",
+            "arrays-exp",
+            "fp-exp",
+            "ksmt.optimize.theories",
+            "ksmt.quantifiers-allowed"
+          ]
+        }
+      },
       "additionalProperties": { "type": "string", "minLength": 1 }
     }
   }

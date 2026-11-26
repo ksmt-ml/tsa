@@ -26,7 +26,8 @@ data class TsaCvc5ConfigurationDocument(
         require(backendRole in TvmCvc5Configuration.BACKEND_ROLES) {
             "Unsupported cvc5 backend role: $backendRole"
         }
-        require(options.isNotEmpty()) { "A cvc5 configuration must set at least one option" }
+        // The apply path and its document share one set of option rules, so they cannot diverge.
+        TvmCvc5Configuration.validateOptions(options)
     }
 
     fun toConfiguration(): TvmCvc5Configuration =
@@ -39,11 +40,22 @@ data class TsaCvc5ConfigurationDocument(
     companion object {
         const val SCHEMA_VERSION = "tsa-cvc5-configuration-v0"
 
+        /** Classpath location of the JSON schema packaged with this document type. */
+        const val SCHEMA_RESOURCE = "org/usvm/machine/schemas/tsa-cvc5-configuration-v0.schema.json"
+
+        /**
+         * Reads a document from [path].
+         *
+         * Every rejection is reported as an [IllegalArgumentException] naming [path], because the
+         * caller is a command line option and the path is the only context an operator has.
+         */
         fun load(path: Path): TsaCvc5ConfigurationDocument {
             require(path.isRegularFile()) { "cvc5 configuration does not exist: $path" }
-            return json.decodeFromString(serializer(), path.readText())
+            return try {
+                Json.decodeFromString(serializer(), path.readText())
+            } catch (failure: Exception) {
+                throw IllegalArgumentException("Invalid cvc5 configuration $path: ${failure.message}", failure)
+            }
         }
-
-        private val json = Json { ignoreUnknownKeys = false }
     }
 }

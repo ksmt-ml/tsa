@@ -21,6 +21,7 @@ import java.time.Instant
 import kotlin.io.path.readText
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertNull
 import kotlin.test.assertTrue
 import kotlin.time.Duration.Companion.nanoseconds
 import kotlin.time.Duration.Companion.seconds
@@ -213,8 +214,8 @@ class TvmSolverProfilingTest {
             assertEquals("test-space-v0", regularBv.attributes[TvmComponents.CVC5_PARAMETER_SPACE_ATTRIBUTE])
 
             val integerBlasted = backends.single { it.solver.attributes["backend-role"] == "integer-blasted" }
-            assertEquals(null, integerBlasted.initialConfiguration.overrides["bv-solver"])
-            assertEquals(null, integerBlasted.attributes[TvmComponents.CVC5_PARAMETER_SPACE_ATTRIBUTE])
+            assertNull(integerBlasted.initialConfiguration.overrides["bv-solver"])
+            assertNull(integerBlasted.attributes[TvmComponents.CVC5_PARAMETER_SPACE_ATTRIBUTE])
         } finally {
             outputDirectory.toFile().deleteRecursively()
         }

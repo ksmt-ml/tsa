@@ -6,6 +6,8 @@ import kotlin.io.path.writeText
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
+import kotlin.test.assertNotNull
+import kotlin.test.assertTrue
 
 class TsaCvc5ConfigurationDocumentTest {
     @Test
@@ -41,6 +43,41 @@ class TsaCvc5ConfigurationDocumentTest {
     }
 
     @Test
+    fun `rejects an evaluator-controlled option and names the document`() {
+        withDocument(validDocument().replace("bv-solver", "logic")) { path ->
+            val failure = assertFailsWith<IllegalArgumentException> { TsaCvc5ConfigurationDocument.load(path) }
+
+            val message = assertNotNull(failure.message)
+            assertTrue(message.contains(path.toString()), "message must name the document: $message")
+            assertTrue(message.contains("logic"), "message must name the option: $message")
+        }
+    }
+
+    @Test
+    fun `rejects a KSMT configuration key`() {
+        withDocument(validDocument().replace("bv-solver", "ksmt.optimize.theories")) { path ->
+            assertFailsWith<IllegalArgumentException> { TsaCvc5ConfigurationDocument.load(path) }
+        }
+    }
+
+    @Test
+    fun `rejects an unknown property`() {
+        withDocument(validDocument().replace("\"options\"", "\"unknownProperty\": \"x\",\n  \"options\"")) { path ->
+            assertFailsWith<IllegalArgumentException> { TsaCvc5ConfigurationDocument.load(path) }
+        }
+    }
+
+    @Test
+    fun `reports the document path for malformed json`() {
+        withDocument("{ not json") { path ->
+            val failure = assertFailsWith<IllegalArgumentException> { TsaCvc5ConfigurationDocument.load(path) }
+
+            val message = assertNotNull(failure.message)
+            assertTrue(message.contains(path.toString()), "message must name the document: $message")
+        }
+    }
+
+    @Test
     fun `rejects a missing file`() {
         val directory = Files.createTempDirectory("tsa-cvc5-configuration-missing-test")
         try {
@@ -50,6 +87,13 @@ class TsaCvc5ConfigurationDocumentTest {
         } finally {
             directory.toFile().deleteRecursively()
         }
+    }
+
+    @Test
+    fun `packages its json schema`() {
+        val resource = TsaCvc5ConfigurationDocument.SCHEMA_RESOURCE
+
+        assertNotNull(javaClass.classLoader.getResource(resource), "schema resource $resource is not packaged")
     }
 
     private fun withDocument(
@@ -77,6 +121,6 @@ class TsaCvc5ConfigurationDocumentTest {
         """.trimIndent()
 
     private companion object {
-        const val SCHEMA_VERSION = "tsa-cvc5-configuration-v0"
+        val SCHEMA_VERSION = TsaCvc5ConfigurationDocument.SCHEMA_VERSION
     }
 }

@@ -91,9 +91,9 @@ data class TvmOptions(
 /**
  * A cvc5 configuration applied to one backend role while its solver is constructed.
  *
- * The patch is expected to be pre-validated by the tuner against a versioned parameter space. TSA
- * applies it without re-validating option domains, and records it in the captured profile so that a
- * replay reproduces exactly the configuration the profile was captured with.
+ * The tuner is expected to have validated the option domains against a versioned parameter space.
+ * TSA additionally refuses the names it owns itself, and records the applied options in the captured
+ * profile so that a replay reproduces exactly the configuration the profile was captured with.
  */
 data class TvmCvc5Configuration(
     val backendRole: String,
@@ -103,9 +103,7 @@ data class TvmCvc5Configuration(
     init {
         require(backendRole in BACKEND_ROLES) { "Unsupported cvc5 backend role: $backendRole" }
         require(parameterSpaceId.isNotBlank()) { "Parameter-space id must not be blank" }
-        require(options.isNotEmpty()) { "A cvc5 configuration must set at least one option" }
-        require(options.keys.none { it.isBlank() }) { "cvc5 option names must not be blank" }
-        require(options.values.none { it.isBlank() }) { "cvc5 option values must not be blank" }
+        validateOptions(options)
     }
 
     companion object {
@@ -113,6 +111,42 @@ data class TvmCvc5Configuration(
         const val INTEGER_BLASTED_BACKEND = "integer-blasted"
 
         val BACKEND_ROLES = setOf(REGULAR_BV_BACKEND, INTEGER_BLASTED_BACKEND)
+
+        /**
+         * Option names a configuration must never set.
+         *
+         * The evaluator owns these. A profile that records one of them cannot be replayed, because
+         * the replay sets the logic and the per-check timeout itself and takes the rest from the
+         * recorded initial configuration. KSMT writes its own keys into that same override map, so a
+         * cvc5 option sharing one of those names would silently replace a KSMT setting.
+         */
+        val RESERVED_OPTIONS =
+            TvmCvc5ReplayCandidate.PROTECTED_OPTIONS + TvmSolverProfileWriter.KSMT_CONFIGURATION_KEYS
+
+        /** Checks the option map that the apply path and the document describing it both obey. */
+        internal fun validateOptions(options: Map<String, String>) {
+            require(options.isNotEmpty()) { "A cvc5 configuration must set at least one option" }
+            require(options.keys.none { it.isBlank() }) { "cvc5 option names must not be blank" }
+            require(options.values.none { it.isBlank() }) { "cvc5 option values must not be blank" }
+            val reserved = options.keys.filter { it in RESERVED_OPTIONS }.sorted()
+            require(reserved.isEmpty()) {
+                "A cvc5 configuration must not set evaluator- or KSMT-controlled options: $reserved"
+            }
+        }
+
+        /**
+         * Option names of [options] that [inventory] does not accept, sorted.
+         *
+         * Advisory only: a parameter space owns option domains, and an inventory describes a single
+         * native library build, so callers report these names instead of rejecting the configuration.
+         */
+        fun unknownOptionNames(
+            options: Map<String, String>,
+            inventory: TvmCvc5OptionInventory,
+        ): List<String> {
+            val accepted = inventory.options.flatMapTo(mutableSetOf()) { it.aliases + it.name }
+            return options.keys.filterNot { it in accepted }.sorted()
+        }
     }
 }
 

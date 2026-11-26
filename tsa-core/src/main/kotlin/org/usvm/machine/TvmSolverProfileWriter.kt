@@ -386,6 +386,18 @@ class TvmSolverProfileWriter(
         /** Every profile artifact of one workload revision starts with this prefix. */
         const val FILE_NAME_PREFIX = "tsa-solver-profile-"
 
+        /**
+         * Initial-configuration keys that describe a KSMT-level setting rather than a cvc5 option.
+         *
+         * A replay reads them from the recorded initial configuration, and KSMT writes them into the
+         * same override map as the cvc5 options, so a cvc5 option must never use one of these names.
+         */
+        const val OPTIMIZE_THEORIES_CONFIGURATION_KEY = "ksmt.optimize.theories"
+        const val QUANTIFIERS_ALLOWED_CONFIGURATION_KEY = "ksmt.quantifiers-allowed"
+
+        val KSMT_CONFIGURATION_KEYS =
+            setOf(OPTIMIZE_THEORIES_CONFIGURATION_KEY, QUANTIFIERS_ALLOWED_CONFIGURATION_KEY)
+
         private const val MAX_FILE_NAME_ID_LENGTH = 80
 
         private val json =

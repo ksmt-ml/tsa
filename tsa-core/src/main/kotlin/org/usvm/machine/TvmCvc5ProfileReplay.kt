@@ -327,20 +327,20 @@ class TvmCvc5ProfileReplayEvaluator {
         }
         val overrides = initialConfiguration.requiredObject("overrides")
         val theories =
-            overrides["ksmt.optimize.theories"]
+            overrides[TvmSolverProfileWriter.OPTIMIZE_THEORIES_CONFIGURATION_KEY]
                 ?.jsonPrimitive
                 ?.content
                 ?.split(',')
                 ?.filter(String::isNotBlank)
                 ?.mapTo(linkedSetOf()) { KTheory.valueOf(it) }
         val quantifiersAllowed =
-            overrides["ksmt.quantifiers-allowed"]
+            overrides[TvmSolverProfileWriter.QUANTIFIERS_ALLOWED_CONFIGURATION_KEY]
                 ?.jsonPrimitive
                 ?.boolean
                 ?: false
         val initialCvc5Options =
             overrides
-                .filterKeys { it !in KSMT_CONFIGURATION_KEYS }
+                .filterKeys { it !in TvmSolverProfileWriter.KSMT_CONFIGURATION_KEYS }
                 .mapValues { (_, value) -> value.jsonPrimitive.content }
         require(initialCvc5Options.keys.none { it in TvmCvc5ReplayCandidate.PROTECTED_OPTIONS }) {
             "Initial profile changes an evaluator-controlled cvc5 option"
@@ -653,11 +653,6 @@ class TvmCvc5ProfileReplayEvaluator {
     companion object {
         private const val MAX_RECORDED_MISMATCHES = 20
         private const val MAX_FAILURE_MESSAGE_LENGTH = 1_000
-        private val KSMT_CONFIGURATION_KEYS =
-            setOf(
-                "ksmt.optimize.theories",
-                "ksmt.quantifiers-allowed",
-            )
 
         private val json = Json { ignoreUnknownKeys = false }
 
