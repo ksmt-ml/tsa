@@ -83,16 +83,31 @@ class TvmComponents(
         val pipelineInstanceId = UUID.randomUUID().toString()
         val applicationProfileId = UUID.randomUUID().toString()
 
+        val bvConfiguration =
+            options.cvc5Configuration?.takeIf {
+                it.backendRole == TvmCvc5Configuration.REGULAR_BV_BACKEND
+            }
+        val intConfiguration =
+            options.cvc5Configuration?.takeIf {
+                it.backendRole == TvmCvc5Configuration.INTEGER_BLASTED_BACKEND
+            }
+
         val rawBvSolver =
             KCvc5Solver(ctx).apply {
                 configure {
                     optimizeForTheories(setOf(KTheory.UF, KTheory.Array, KTheory.BV))
+                    bvConfiguration?.options?.toSortedMap()?.forEach { (option, value) ->
+                        setCvc5Option(option, value)
+                    }
                 }
             }
         val rawIntSolver =
             KCvc5Solver(ctx).apply {
                 configure {
                     optimizeForTheories(setOf(KTheory.UF, KTheory.Array, KTheory.LIA, KTheory.NIA))
+                    intConfiguration?.options?.toSortedMap()?.forEach { (option, value) ->
+                        setCvc5Option(option, value)
+                    }
                 }
             }
 
@@ -104,8 +119,9 @@ class TvmComponents(
                     profileId = UUID.randomUUID().toString(),
                     parentProfileId = applicationProfileId,
                     pipelineInstanceId = pipelineInstanceId,
-                    backendRole = "regular-bv",
+                    backendRole = TvmCvc5Configuration.REGULAR_BV_BACKEND,
                     theories = "UF,Array,BV",
+                    cvc5Options = bvConfiguration?.options.orEmpty(),
                 )
             } ?: rawBvSolver
         val intSolver =
@@ -116,8 +132,9 @@ class TvmComponents(
                     profileId = UUID.randomUUID().toString(),
                     parentProfileId = applicationProfileId,
                     pipelineInstanceId = pipelineInstanceId,
-                    backendRole = "integer-blasted",
+                    backendRole = TvmCvc5Configuration.INTEGER_BLASTED_BACKEND,
                     theories = "UF,Array,LIA,NIA",
+                    cvc5Options = intConfiguration?.options.orEmpty(),
                 )
             } ?: rawIntSolver
 
@@ -199,6 +216,7 @@ class TvmComponents(
         pipelineInstanceId: String,
         backendRole: String,
         theories: String,
+        cvc5Options: Map<String, String>,
     ): KRecordingSolverProfiler<Config> =
         KRecordingSolverProfiler(
             delegate = delegate,
@@ -211,7 +229,7 @@ class TvmComponents(
             profileId = profileId,
             runId = profileOptions.runId,
             parentProfileId = parentProfileId,
-            initialConfiguration = cvc5Configuration(theories),
+            initialConfiguration = cvc5Configuration(theories, cvc5Options),
             profileAttributes =
                 profileAttributes(
                     profileOptions = profileOptions,
@@ -222,9 +240,17 @@ class TvmComponents(
                         "backend-role" to backendRole,
                         TvmSolverProfileWriter.EXPRESSION_NORMALIZATION_ATTRIBUTE to
                             TvmSolverProfileWriter.IDENTITY_NORMALIZATION,
-                    ),
+                    ) +
+                    cvc5ConfigurationAttributes(backendRole),
             maxRecordedEvents = profileOptions.maxRecordedEvents,
         ).also(solverProfilers::add)
+
+    /** Provenance of the applied configuration, so a captured workload stays explainable. */
+    private fun cvc5ConfigurationAttributes(backendRole: String): Map<String, String> =
+        options.cvc5Configuration
+            ?.takeIf { it.backendRole == backendRole }
+            ?.let { mapOf(CVC5_PARAMETER_SPACE_ATTRIBUTE to it.parameterSpaceId) }
+            .orEmpty()
 
     private fun applicationConfiguration(): KSolverConfigurationSnapshot =
         KSolverConfigurationSnapshot(
@@ -236,14 +262,24 @@ class TvmComponents(
                 ),
         )
 
-    private fun cvc5Configuration(theories: String): KSolverConfigurationSnapshot =
+    /**
+     * The initial configuration recorded in a backend profile.
+     *
+     * Applied cvc5 options are part of it, because a replay reconstructs the workload from this
+     * snapshot: omitting them would make the replay measure a different workload than the capture.
+     */
+    private fun cvc5Configuration(
+        theories: String,
+        cvc5Options: Map<String, String>,
+    ): KSolverConfigurationSnapshot =
         KSolverConfigurationSnapshot(
             base = KSolverConfigurationBase.SOLVER_DEFAULTS,
             overrides =
                 mapOf(
                     "ksmt.optimize.theories" to KSolverConfigurationValue.StringValue(theories),
                     "ksmt.quantifiers-allowed" to KSolverConfigurationValue.BoolValue(false),
-                ),
+                ) +
+                    cvc5Options.mapValues { (_, value) -> KSolverConfigurationValue.StringValue(value) },
         )
 
     private fun profileAttributes(
@@ -335,6 +371,9 @@ class TvmComponents(
     }
 
     companion object {
+        /** Profile attribute naming the parameter space the applied configuration came from. */
+        const val CVC5_PARAMETER_SPACE_ATTRIBUTE = "cvc5.parameter-space-id"
+
         private val logger = object : KLogging() {}.logger
     }
 }

@@ -6,6 +6,7 @@ import io.ksmt.profiling.KSolverCallMetadata
 import io.ksmt.profiling.KSolverCallOutcome
 import io.ksmt.profiling.KSolverConfigurationBase
 import io.ksmt.profiling.KSolverConfigurationSnapshot
+import io.ksmt.profiling.KSolverConfigurationValue
 import io.ksmt.profiling.KSolverDescriptor
 import io.ksmt.profiling.KSolverProfile
 import io.ksmt.profiling.KSolverProfileState
@@ -158,6 +159,62 @@ class TvmSolverProfilingTest {
                     emittedIds.any { id -> file.fileName.toString().contains(id) }
                 },
             )
+        } finally {
+            outputDirectory.toFile().deleteRecursively()
+        }
+    }
+
+    @Test
+    fun `applied cvc5 configuration reaches the profile and stays on its backend role`() {
+        val outputDirectory = Files.createTempDirectory("tsa-cvc5-configuration-test")
+        val emitted = mutableListOf<KSolverProfile>()
+        val options =
+            TvmOptions(
+                solverProfileOptions =
+                    TvmSolverProfileOptions(
+                        outputDirectory,
+                        onTerminalProfile = { emitted += it },
+                    ),
+                cvc5Configuration =
+                    TvmCvc5Configuration(
+                        backendRole = TvmCvc5Configuration.REGULAR_BV_BACKEND,
+                        parameterSpaceId = "test-space-v0",
+                        options = mapOf("bv-solver" to "bitblast-internal"),
+                    ),
+            )
+        val components = TvmComponents(options)
+        val ctx = TvmContext(options, components)
+
+        try {
+            try {
+                components.mkKsmtSolver(ctx).let { solver ->
+                    solver.push()
+                    solver.assert(ctx.mkTrue())
+                    // A rejected option would fail solver initialization here.
+                    assertEquals(KSolverStatus.SAT, solver.check(1.seconds))
+                    solver.pop()
+                }
+            } finally {
+                try {
+                    components.close()
+                } finally {
+                    ctx.close()
+                }
+            }
+
+            val backends = emitted.filter { it.solver.name == "cvc5" }
+            assertEquals(2, backends.size)
+
+            val regularBv = backends.single { it.solver.attributes["backend-role"] == "regular-bv" }
+            assertEquals(
+                KSolverConfigurationValue.StringValue("bitblast-internal"),
+                regularBv.initialConfiguration.overrides["bv-solver"],
+            )
+            assertEquals("test-space-v0", regularBv.attributes[TvmComponents.CVC5_PARAMETER_SPACE_ATTRIBUTE])
+
+            val integerBlasted = backends.single { it.solver.attributes["backend-role"] == "integer-blasted" }
+            assertEquals(null, integerBlasted.initialConfiguration.overrides["bv-solver"])
+            assertEquals(null, integerBlasted.attributes[TvmComponents.CVC5_PARAMETER_SPACE_ATTRIBUTE])
         } finally {
             outputDirectory.toFile().deleteRecursively()
         }

@@ -67,6 +67,13 @@ data class TvmOptions(
     val forkOnEachPossibleElementInDictGet: Boolean = false,
     /** Optional collection of KSMT solver workload profiles. Disabled by default. */
     val solverProfileOptions: TvmSolverProfileOptions? = null,
+    /**
+     * Optional cvc5 configuration applied to one backend role while its solver is constructed.
+     *
+     * Options are applied before the first assertion, as cvc5 requires. Active solvers are never
+     * reconfigured.
+     */
+    val cvc5Configuration: TvmCvc5Configuration? = null,
 ) {
     init {
         check(enableOutMessageAnalysis || !intercontractOptions.isIntercontractEnabled) {
@@ -78,6 +85,34 @@ data class TvmOptions(
         check(!addTimeoutIfNotSatiated || divideTimeBetweenOpcodes == null) {
             "Cannot use strategy [addTimeoutIfNotSatiated] together with [divideTimeBetweenOpcodes]"
         }
+    }
+}
+
+/**
+ * A cvc5 configuration applied to one backend role while its solver is constructed.
+ *
+ * The patch is expected to be pre-validated by the tuner against a versioned parameter space. TSA
+ * applies it without re-validating option domains, and records it in the captured profile so that a
+ * replay reproduces exactly the configuration the profile was captured with.
+ */
+data class TvmCvc5Configuration(
+    val backendRole: String,
+    val parameterSpaceId: String,
+    val options: Map<String, String>,
+) {
+    init {
+        require(backendRole in BACKEND_ROLES) { "Unsupported cvc5 backend role: $backendRole" }
+        require(parameterSpaceId.isNotBlank()) { "Parameter-space id must not be blank" }
+        require(options.isNotEmpty()) { "A cvc5 configuration must set at least one option" }
+        require(options.keys.none { it.isBlank() }) { "cvc5 option names must not be blank" }
+        require(options.values.none { it.isBlank() }) { "cvc5 option values must not be blank" }
+    }
+
+    companion object {
+        const val REGULAR_BV_BACKEND = "regular-bv"
+        const val INTEGER_BLASTED_BACKEND = "integer-blasted"
+
+        val BACKEND_ROLES = setOf(REGULAR_BV_BACKEND, INTEGER_BLASTED_BACKEND)
     }
 }
 
