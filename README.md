@@ -31,6 +31,21 @@ TSA remains authoritative for workload execution, the correctness oracle, and
 the produced artifacts. A configuration is applied only while constructing a
 fresh cvc5 solver, before its first assertion.
 
+A configuration produced by the tuner is applied to a real analysis with
+`--cvc5-configuration <file>`, where the file is a
+[`tsa-cvc5-configuration-v0`](tsa-core/schemas/tsa-cvc5-configuration-v0.schema.json)
+document naming the backend role and the cvc5 options:
+
+```bash
+java -jar tsa-cli.jar boc -i contract.boc \
+  --cvc5-configuration cvc5-configuration.json -o report.sarif
+```
+
+Only the named backend role is configured; the other one keeps the defaults.
+Options reach the solver before its first assertion, and a captured profile
+records them, so replaying that profile reproduces exactly the configuration the
+profile was captured with.
+
 ### Funding
 TSA has been funded by the [TON Foundation grant](https://github.com/ton-society/grants-and-bounties/issues/489) grant and has been developed under the [8-month roadmap](https://questbook.app/dashboard/?proposalId=667ee6b9b59d3e9ae042d6c9&chainId=10&role=builder&isRenderingProposalBody=true&grantId=65c7836df27e2e1702d2d279).
 

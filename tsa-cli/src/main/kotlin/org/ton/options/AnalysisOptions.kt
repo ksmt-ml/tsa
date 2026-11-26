@@ -48,6 +48,13 @@ class AnalysisOptions : OptionGroup("Symbolic analysis options") {
         .default(100)
         .help("Write an atomic in-progress snapshot after this many checks. Default: 100.")
 
+    val cvc5ConfigurationPath by option("--cvc5-configuration")
+        .path(mustExist = true, canBeFile = true, canBeDir = false)
+        .help(
+            "Path to a tsa-cvc5-configuration-v0 document with the cvc5 options applied to one " +
+                "backend role while its solver is constructed. The other role keeps the defaults.",
+        )
+
     val continueOnContractException by option("--continue-on-contract-exception")
         .flag()
         .help(

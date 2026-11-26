@@ -16,6 +16,7 @@ import org.usvm.machine.FollowTrace
 import org.usvm.machine.IntercontractOptions
 import org.usvm.machine.NoAdditionalStopStrategy
 import org.usvm.machine.TimeDivisionBetweenOpcodes
+import org.usvm.machine.TsaCvc5ConfigurationDocument
 import org.usvm.machine.TvmAnalyzer
 import org.usvm.machine.TvmConcreteContractData
 import org.usvm.machine.TvmContext
@@ -82,6 +83,10 @@ private fun createTvmOptions(
                     TvmPathSelectionStrategy.DFS_STRICT
                 } else {
                     TvmPathSelectionStrategy.DFS_BASED
+                },
+            cvc5Configuration =
+                analysisOptions.cvc5ConfigurationPath?.let { path ->
+                    TsaCvc5ConfigurationDocument.load(path).toConfiguration()
                 },
             solverProfileOptions =
                 analysisOptions.solverProfileDirectory?.let { outputDirectory ->

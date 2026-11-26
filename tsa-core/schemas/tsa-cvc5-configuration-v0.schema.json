@@ -1,0 +1,19 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://ksmt.io/schemas/tsa-cvc5-configuration-v0.schema.json",
+  "title": "TSA cvc5 configuration",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "parameterSpaceId", "backendRole", "options"],
+  "properties": {
+    "schemaVersion": { "const": "tsa-cvc5-configuration-v0" },
+    "parameterSpaceId": { "type": "string", "minLength": 1 },
+    "backendRole": { "enum": ["regular-bv", "integer-blasted"] },
+    "options": {
+      "type": "object",
+      "minProperties": 1,
+      "propertyNames": { "not": { "const": "logic" } },
+      "additionalProperties": { "type": "string", "minLength": 1 }
+    }
+  }
+}
