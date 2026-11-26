@@ -15,9 +15,11 @@ import org.usvm.machine.TvmContext.Companion.RECEIVE_EXTERNAL_ID
 import org.usvm.machine.TvmContext.Companion.RECEIVE_INTERNAL_ID
 import org.usvm.machine.TvmOptions
 import org.usvm.machine.TvmSolverProfileOptions
+import org.usvm.machine.TvmSolverProfileWriter
 import org.usvm.machine.analyzeSpecificMethod
 import org.usvm.machine.getFuncContract
 import java.nio.file.Path
+import kotlin.io.path.listDirectoryEntries
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.seconds
 import kotlin.time.TimeSource
@@ -29,9 +31,10 @@ import kotlin.time.TimeSource
  * enabled, and emits every terminal profile to the sink. TSA is never invoked as a subprocess and
  * captured profiles are never rewritten.
  *
- * TSA applies its own timeout to every method independently, so the requested timeout is split
- * between the remaining methods. The launch stops at the first method boundary where cancellation
- * or the deadline is reached, and reports only the profiles that were fully captured.
+ * TSA applies its own timeout to every method independently, so each method receives the smaller of
+ * the workload's method timeout and its share of the remaining launch budget. The launch stops at
+ * the first method boundary where cancellation or the deadline is reached, and reports only the
+ * profiles that were fully captured.
  */
 class TsaSolverProfileLauncherImpl(
     private val catalog: TsaAnalysisWorkloadCatalog,
@@ -82,6 +85,18 @@ class TsaSolverProfileLauncherImpl(
             return result(TsaSolverProfileLaunchStatus.TIMED_OUT)
         }
 
+        val profilesDirectory =
+            profileStoreRoot.resolve(request.workload.workloadId).resolve(request.workload.revision)
+        existingProfileCount(profilesDirectory)?.let { existing ->
+            return result(
+                TsaSolverProfileLaunchStatus.FAILED,
+                failureType = "TsaProfileDirectoryNotEmpty",
+                failureMessage =
+                    "Refusing to capture into a workload revision that already holds $existing " +
+                        "profile(s): $profilesDirectory",
+            )
+        }
+
         val contract =
             try {
                 loadContract(workload)
@@ -102,8 +117,6 @@ class TsaSolverProfileLauncherImpl(
             )
         }
 
-        val profilesDirectory =
-            profileStoreRoot.resolve(request.workload.workloadId).resolve(request.workload.revision)
         val collectingSink =
             TsaSolverProfileSink { profile ->
                 captured += profile
@@ -127,6 +140,14 @@ class TsaSolverProfileLauncherImpl(
                     break
                 }
 
+                val remainingPerMethod = remaining?.div(methods.size - index)
+                val methodTimeout =
+                    if (remainingPerMethod == null) {
+                        workload.methodTimeoutSeconds.seconds
+                    } else {
+                        minOf(workload.methodTimeoutSeconds.seconds, remainingPerMethod)
+                    }
+
                 analyzeSpecificMethod(
                     contract,
                     methods[index],
@@ -136,7 +157,7 @@ class TsaSolverProfileLauncherImpl(
                             workload = workload,
                             profilesDirectory = profilesDirectory,
                             sink = collectingSink,
-                            methodTimeout = remaining?.div(methods.size - index) ?: Duration.INFINITE,
+                            methodTimeout = methodTimeout,
                         ),
                 )
             }
@@ -151,6 +172,22 @@ class TsaSolverProfileLauncherImpl(
 }
 
 private const val DEFAULT_CHECKPOINT_INTERVAL_CHECKS = 500
+
+/**
+ * Number of profile artifacts already present in a workload revision, or null when there are none.
+ *
+ * A workload revision is immutable: profiles of different runs must never be mixed, because the
+ * resolver would then measure a workload that no capture ever produced.
+ */
+private fun existingProfileCount(directory: Path): Int? =
+    if (!directory.toFile().isDirectory) {
+        null
+    } else {
+        directory
+            .listDirectoryEntries()
+            .count { it.fileName.toString().startsWith(TvmSolverProfileWriter.FILE_NAME_PREFIX) }
+            .takeIf { it > 0 }
+    }
 
 private fun loadContract(workload: TsaAnalysisWorkload): TsaContractCode =
     when (workload.sourceKind) {

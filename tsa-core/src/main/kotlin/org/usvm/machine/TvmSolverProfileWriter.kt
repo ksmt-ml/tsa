@@ -44,7 +44,7 @@ class TvmSolverProfileWriter(
     fun write(profile: KSolverProfile): Path {
         Files.createDirectories(outputDirectory)
 
-        val fileName = "tsa-solver-profile-${profile.runId.fileNamePart()}-${profile.profileId.fileNamePart()}.json"
+        val fileName = "$FILE_NAME_PREFIX${profile.runId.fileNamePart()}-${profile.profileId.fileNamePart()}.json"
         val target = outputDirectory.resolve(fileName)
         val temporary = Files.createTempFile(outputDirectory, ".$fileName-", ".tmp")
 
@@ -382,6 +382,10 @@ class TvmSolverProfileWriter(
         const val EXPRESSION_NORMALIZATION_ATTRIBUTE = "expression-normalization"
         const val IDENTITY_NORMALIZATION = "identity-v0"
         const val TSA_BV_ARITHMETIC_NORMALIZATION = "tsa-bv-arithmetic-v0"
+
+        /** Every profile artifact of one workload revision starts with this prefix. */
+        const val FILE_NAME_PREFIX = "tsa-solver-profile-"
+
         private const val MAX_FILE_NAME_ID_LENGTH = 80
 
         private val json =

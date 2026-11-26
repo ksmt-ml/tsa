@@ -63,16 +63,31 @@ class TsaSolverProfileLauncherTest {
         }
     }
 
+    @Test
+    fun `refuses to capture into a revision that already holds profiles`() {
+        withLauncher(writeExistingProfile = true) { launcher ->
+            val result = launcher.launch(request(), TsaSolverProfileSink {}, TsaLaunchCancellation.NONE)
+
+            assertEquals(TsaSolverProfileLaunchStatus.FAILED, result.status)
+            assertEquals("TsaProfileDirectoryNotEmpty", result.failureType)
+            assertEquals(0L, result.capturedProfiles)
+        }
+    }
+
     private fun withLauncher(
         writeDescriptor: Boolean = true,
+        writeExistingProfile: Boolean = false,
         block: (TsaSolverProfileLauncherImpl) -> Unit,
     ) {
         val root = Files.createTempDirectory("tsa-tuning-launcher-test")
         try {
+            val directory = root.resolve(WORKLOAD_ID).resolve(REVISION)
+            directory.createDirectories()
             if (writeDescriptor) {
-                val directory = root.resolve(WORKLOAD_ID).resolve(REVISION)
-                directory.createDirectories()
                 directory.resolve(DESCRIPTOR_FILE_NAME).writeText(descriptor())
+            }
+            if (writeExistingProfile) {
+                directory.resolve(EXISTING_PROFILE_FILE_NAME).writeText("{}")
             }
             block(
                 TsaSolverProfileLauncherImpl(
@@ -110,5 +125,8 @@ class TsaSolverProfileLauncherTest {
         const val WORKLOAD_ID = "workload-0"
         const val REVISION = "rev-0"
         const val DESCRIPTOR_FILE_NAME = "workload.json"
+
+        /** Matches the artifact naming convention of `TvmSolverProfileWriter`. */
+        const val EXISTING_PROFILE_FILE_NAME = "tsa-solver-profile-run-0-profile-0.json"
     }
 }
